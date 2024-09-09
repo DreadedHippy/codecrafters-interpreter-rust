@@ -9,7 +9,7 @@ pub type ScannerResult<T> = Result<T, ScannerError>;
 
 impl ScannerError {
 	pub fn report(&self, where_: &str) {
-		println!("[line {}] Error{}: {}", self.line, where_, self.message);
+		eprintln!("[line {}] Error{}: {}", self.line, where_, self.message);
 	}
 }
 
