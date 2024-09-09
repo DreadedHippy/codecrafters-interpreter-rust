@@ -1,15 +1,12 @@
 use error::{ScannerError, ScannerResult};
 use token::{Literal, Token, TokenType};
 
-
 pub mod error;
 pub mod token;
 
 pub fn tokenize(source: String) -> ScannerResult<Vec<Token>> {
 	let mut scanner = Scanner::new(source);
-
 	let tokens = scanner.scan_tokens()?;
-
 	Ok(tokens)
 }
 

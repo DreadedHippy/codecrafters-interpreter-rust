@@ -47,12 +47,6 @@ impl std::fmt::Display for TokenType {
 	}
 }
 
-// impl ToString for Token {
-// 	fn to_string(&self) -> String {
-// 		return format!("{} {} {}", self.token_type, self.lexeme, self.literal);
-// 	}
-// }
-
 #[derive(Clone, Debug)]
 pub enum Literal {
 	Null,
