@@ -2,6 +2,10 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
+use scanner::tokenize;
+
+pub mod scanner;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -24,7 +28,12 @@ fn main() {
 
             // Uncomment this block to pass the first stage
             if !file_contents.is_empty() {
-                panic!("Scanner not implemented");
+                // panic!("Scanner not implemented");
+                let e = tokenize(file_contents.to_string()).expect("Failed to tokenize input");
+                
+                for i in e {
+                    println!("{}", i);
+                }
             } else {
                 println!("EOF  null"); // Placeholder, remove this line when implementing the scanner
             }
