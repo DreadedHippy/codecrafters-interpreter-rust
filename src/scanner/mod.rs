@@ -54,6 +54,22 @@ impl Scanner {
       '+' => self.add_token(TokenType::PLUS),
       ';' => self.add_token(TokenType::SEMICOLON),
       '*' => self.add_token(TokenType::STAR),
+      '!' => {
+				let c = if self.match_char('=') {TokenType::BANG_EQUAL} else {TokenType::BANG};
+				self.add_token(c);
+			},
+			'=' => {
+				let c = if self.match_char('=') {TokenType::EQUAL_EQUAL} else {TokenType::EQUAL};
+				self.add_token(c);
+			},
+			'<' => {
+				let c = if self.match_char('=') {TokenType::LESS_EQUAL} else {TokenType::LESS};
+				self.add_token(c);
+			},
+			'>' => {
+				let c = if self.match_char('=') {TokenType::GREATER_EQUAL} else {TokenType::GREATER};
+				self.add_token(c);
+			},
 			k => {
 				self.error(
 					ScannerError {
@@ -66,6 +82,28 @@ impl Scanner {
 
 		return Ok(())
   }
+
+	fn match_char(&mut self, expected: char) -> bool{
+		if self.is_at_end() {
+			return false
+		}
+
+		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
+
+		if c.is_err() {
+			return false
+		}
+
+		let c = c.unwrap();
+
+		if c != expected {
+			return false
+		}
+
+		self.current += 1;
+		return true
+
+	}
 
 	fn advance(&mut self) -> ScannerResult<char> {
 		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
