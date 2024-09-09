@@ -4,18 +4,13 @@ use token::{Literal, Token, TokenType};
 pub mod error;
 pub mod token;
 
-pub fn tokenize(source: String) -> ScannerResult<Vec<Token>> {
-	let mut scanner = Scanner::new(source);
-	let tokens = scanner.scan_tokens()?;
-	Ok(tokens)
-}
-
 pub struct Scanner {
 	source: String,
 	tokens: Vec<Token>,
 	start: usize,
   current: usize,
   line: usize,
+	pub had_error: bool
 }
 
 impl Scanner {
@@ -25,7 +20,8 @@ impl Scanner {
 			tokens: Vec::new(),
 			start: 0,
 			current: 0,
-			line: 1
+			line: 1,
+			had_error: false
 		}
 	}
 	
@@ -40,7 +36,8 @@ impl Scanner {
 		Ok(self.tokens.clone())
 	}
 
-	fn error(e: ScannerError) {
+	fn error(&mut self, e: ScannerError) {
+		self.had_error = true;
 		e.report("");
 	}
 
@@ -58,7 +55,7 @@ impl Scanner {
       ';' => self.add_token(TokenType::SEMICOLON),
       '*' => self.add_token(TokenType::STAR),
 			k => {
-				Self::error(
+				self.error(
 					ScannerError {
 						line: self.line,
 						message: format!("Unexpected character: {}", k)
