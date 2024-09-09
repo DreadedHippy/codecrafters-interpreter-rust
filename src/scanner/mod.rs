@@ -40,6 +40,10 @@ impl Scanner {
 		Ok(self.tokens.clone())
 	}
 
+	fn error(e: ScannerError) {
+		e.report("");
+	}
+
 	fn scan_token(&mut self) -> ScannerResult<()> {
     let c = self.advance()?;
     match c {
@@ -53,14 +57,21 @@ impl Scanner {
       '+' => self.add_token(TokenType::PLUS),
       ';' => self.add_token(TokenType::SEMICOLON),
       '*' => self.add_token(TokenType::STAR),
-			_ => { return Err(ScannerError::Unexpected { line: self.line, message: "Unexpected character".to_string() })}
+			k => {
+				Self::error(
+					ScannerError {
+						line: self.line,
+						message: format!("Unexpected character: {}", k)
+					}
+				)
+			}
     }
 
 		return Ok(())
   }
 
 	fn advance(&mut self) -> ScannerResult<char> {
-		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError::NthCharNotFound);
+		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
 		self.current += 1;
 
 		return c;
