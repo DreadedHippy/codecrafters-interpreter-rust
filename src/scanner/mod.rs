@@ -70,6 +70,15 @@ impl Scanner {
 				let c = if self.match_char('=') {TokenType::GREATER_EQUAL} else {TokenType::GREATER};
 				self.add_token(c);
 			},
+			'/' => {
+				if self.match_char('/') {
+					while self.peek() != Some('\n') && !self.is_at_end() {
+						self.advance()?;
+					}
+				} else {
+					self.add_token(TokenType::SLASH)
+				}
+			},
 			k => {
 				self.error(
 					ScannerError {
@@ -103,6 +112,13 @@ impl Scanner {
 		self.current += 1;
 		return true
 
+	}
+
+	fn peek(&self) -> Option<char> {
+		if self.is_at_end() {
+			return Some('\0');
+		}
+		return self.source.chars().nth(self.current);
 	}
 
 	fn advance(&mut self) -> ScannerResult<char> {
