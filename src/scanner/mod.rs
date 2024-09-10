@@ -79,6 +79,10 @@ impl Scanner {
 					self.add_token(TokenType::SLASH)
 				}
 			},
+			' ' => {},
+			'\r' => {},
+			'\t' => {},
+			'\n' => {self.line += 1},
 			k => {
 				self.error(
 					ScannerError {
