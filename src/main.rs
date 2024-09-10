@@ -58,3 +58,7 @@ impl Lox {
         }
     }
 }
+
+fn char_at(string: &str, n: usize) -> char {
+    return string.as_bytes()[n] as char;
+}

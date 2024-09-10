@@ -1,6 +1,8 @@
 use error::{ScannerError, ScannerResult};
 use token::{Literal, Token, TokenType};
 
+use crate::char_at;
+
 pub mod error;
 pub mod token;
 
@@ -101,13 +103,7 @@ impl Scanner {
 			return false
 		}
 
-		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
-
-		if c.is_err() {
-			return false
-		}
-
-		let c = c.unwrap();
+		let c = char_at(&self.source, self.current);
 
 		if c != expected {
 			return false
@@ -122,14 +118,16 @@ impl Scanner {
 		if self.is_at_end() {
 			return Some('\0');
 		}
-		return self.source.chars().nth(self.current);
+		
+		return Some(char_at(&self.source, self.current));
 	}
 
 	fn advance(&mut self) -> ScannerResult<char> {
-		let c = self.source.chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
+		let c = char_at(&self.source, self.current);
+		// .chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
 		self.current += 1;
 
-		return c;
+		return Ok(c);
 	}
 
 	fn add_token(&mut self, token_type: TokenType) {
