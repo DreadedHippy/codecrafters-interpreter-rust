@@ -132,7 +132,7 @@ impl Scanner {
 		}
 
 		if self.is_at_end() {
-			self.error(ScannerError { line: self.line, message: "Unterminated string".to_string() });
+			self.error(ScannerError { line: self.line, message: "Unterminated string.".to_string() });
 			return;
 		}
 
