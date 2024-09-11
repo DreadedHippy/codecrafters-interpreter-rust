@@ -41,6 +41,8 @@ pub enum TokenType {
   EOF
 }
 
+// static KEYWORDS: HashMap<&str, TokenType> = HashMap::from_iter([("and", TokenType::AND)]);
+
 impl std::fmt::Display for TokenType {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{:?}", self)
@@ -62,7 +64,7 @@ impl std::fmt::Display for Literal {
 			Self::Null => "null".to_string(),
 			Self::Integer(x) => x.to_string(),
 			Self::String(s) => s.to_string(),
-			Self::Float(f) => f.to_string(),
+			Self::Float(f) => format!("{:?}", f),
 			Self::Boolean(b) => b.to_string()
 		};
 

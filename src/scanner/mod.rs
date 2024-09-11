@@ -157,6 +157,12 @@ impl Scanner {
 
 	}
 
+	// fn identifier(&mut self) {
+	// 	while is_alphanumeric(self.peek()) { self.advance() };
+
+
+	// }
+
 	fn peek(&self) -> char {
 		if self.is_at_end() {
 			return '\0';
