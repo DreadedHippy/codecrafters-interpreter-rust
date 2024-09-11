@@ -5,6 +5,7 @@ use std::io::{self, Write};
 use scanner::Scanner;
 
 pub mod scanner;
+pub mod utils;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

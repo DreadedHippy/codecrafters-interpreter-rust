@@ -1,7 +1,7 @@
 use error::{ScannerError, ScannerResult};
 use token::{Literal, Token, TokenType};
 
-use crate::char_at;
+use crate::{char_at, utils::substring};
 
 pub mod error;
 pub mod token;
@@ -44,7 +44,7 @@ impl Scanner {
 	}
 
 	fn scan_token(&mut self) -> ScannerResult<()> {
-    let c = self.advance()?;
+    let c = self.advance();
     match c {
       '(' => self.add_token(TokenType::LEFT_PAREN),
       ')' => self.add_token(TokenType::RIGHT_PAREN),
@@ -56,6 +56,7 @@ impl Scanner {
       '+' => self.add_token(TokenType::PLUS),
       ';' => self.add_token(TokenType::SEMICOLON),
       '*' => self.add_token(TokenType::STAR),
+			// Double symbols
       '!' => {
 				let c = if self.match_char('=') {TokenType::BANG_EQUAL} else {TokenType::BANG};
 				self.add_token(c);
@@ -74,17 +75,27 @@ impl Scanner {
 			},
 			'/' => {
 				if self.match_char('/') {
-					while self.peek() != Some('\n') && !self.is_at_end() {
-						self.advance()?;
+					while self.peek() != '\n' && !self.is_at_end() {
+						self.advance();
 					}
 				} else {
 					self.add_token(TokenType::SLASH)
 				}
 			},
+			// Whitespace
 			' ' => {},
 			'\r' => {},
 			'\t' => {},
 			'\n' => {self.line += 1},
+			// String literals
+			'"' => {
+				self.string()
+			},
+			// Number literals
+			'1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '0' => {
+				self.number()
+			}
+			// Default
 			k => {
 				self.error(
 					ScannerError {
@@ -114,20 +125,59 @@ impl Scanner {
 
 	}
 
-	fn peek(&self) -> Option<char> {
-		if self.is_at_end() {
-			return Some('\0');
+	fn string(&mut self) {
+		while self.peek() != '"' && !self.is_at_end() {
+			if self.peek() == '\n' { self.line += 1; }
+			self.advance();
 		}
-		
-		return Some(char_at(&self.source, self.current));
+
+		if self.is_at_end() {
+			self.error(ScannerError { line: self.line, message: "Unterminated String".to_string() });
+			return;
+		}
+
+		self.advance();
+
+		let value = substring(&self.source, self.start + 1, self.current - 1);
+		self.add_token_to_list(TokenType::STRING, Literal::String(value.to_string()));
 	}
 
-	fn advance(&mut self) -> ScannerResult<char> {
+	fn number(&mut self) {
+		while self.peek().is_digit(10) {
+			self.advance();
+		}
+
+		if self.peek() == '.' && self.peek_next().is_digit(10) {
+			self.advance();
+
+			while self.peek().is_digit(10) { self.advance();}
+		}
+
+		self.add_token_to_list(TokenType::NUMBER, Literal::Float(substring(&self.source, self.start, self.current).parse::<f64>().unwrap()))
+
+	}
+
+	fn peek(&self) -> char {
+		if self.is_at_end() {
+			return '\0';
+		}
+		
+		return char_at(&self.source, self.current);
+	}
+
+	fn peek_next(&self) -> char {
+		if self.current + 1 >= self.source.len() {
+			return '\0'
+		} 
+
+		return char_at(&self.source, self.current + 1)
+	}
+
+	fn advance(&mut self) -> char {
 		let c = char_at(&self.source, self.current);
-		// .chars().nth(self.current).ok_or_else(|| ScannerError {line: self.line, message: "Nth char not found".to_string()});
 		self.current += 1;
 
-		return Ok(c);
+		return c;
 	}
 
 	fn add_token(&mut self, token_type: TokenType) {
