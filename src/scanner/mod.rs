@@ -1,7 +1,7 @@
 use error::{ScannerError, ScannerResult};
-use token::{Literal, Token, TokenType};
+use token::{keywords, Literal, Token, TokenType};
 
-use crate::{char_at, utils::substring};
+use crate::{char_at, utils::{is_alpha, is_alphanumeric, substring}};
 
 pub mod error;
 pub mod token;
@@ -96,13 +96,18 @@ impl Scanner {
 				self.number()
 			}
 			// Default
-			k => {
-				self.error(
-					ScannerError {
-						line: self.line,
-						message: format!("Unexpected character: {}", k)
-					}
-				)
+			c => {
+				if is_alpha(c) {
+					self.identifier()
+				} else {
+
+					self.error(
+						ScannerError {
+							line: self.line,
+							message: format!("Unexpected character: {}", c)
+						}
+					)
+				}
 			}
     }
 
@@ -157,11 +162,14 @@ impl Scanner {
 
 	}
 
-	// fn identifier(&mut self) {
-	// 	while is_alphanumeric(self.peek()) { self.advance() };
+	fn identifier(&mut self) {
+		while is_alphanumeric(self.peek()) { self.advance();};
+		let text = substring(&self.source, self.start, self.current);
 
+		let token_type = keywords().get(text).unwrap_or(&TokenType::IDENTIFIER).clone();
 
-	// }
+		self.add_token(token_type);
+	}
 
 	fn peek(&self) -> char {
 		if self.is_at_end() {

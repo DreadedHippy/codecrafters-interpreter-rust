@@ -1,3 +1,5 @@
+use std::{collections::HashMap, sync::OnceLock};
+
 #[derive(Clone, Debug)]
 pub struct Token {
 	pub token_type: TokenType,
@@ -39,6 +41,31 @@ pub enum TokenType {
   PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
 
   EOF
+}
+
+pub fn keywords() -> &'static HashMap<&'static str, TokenType> {
+	static HASHMAP: OnceLock<HashMap<&str, TokenType>> = OnceLock::new();
+	HASHMAP.get_or_init(|| {
+		let mut map = HashMap::new();
+			map.insert("and", TokenType::AND);
+			map.insert("and", TokenType::CLASS);
+			map.insert("and", TokenType::ELSE);
+			map.insert("and", TokenType::FALSE);
+			map.insert("and", TokenType::FOR);
+			map.insert("and", TokenType::FUN);
+			map.insert("and", TokenType::IF);
+			map.insert("and", TokenType::NIL);
+			map.insert("and", TokenType::OR);
+			map.insert("and", TokenType::PRINT);
+			map.insert("and", TokenType::RETURN);
+			map.insert("and", TokenType::SUPER);
+			map.insert("and", TokenType::THIS);
+			map.insert("and", TokenType::TRUE);
+			map.insert("and", TokenType::VAR);
+			map.insert("and", TokenType::WHILE);
+
+		map
+	})
 }
 
 // static KEYWORDS: HashMap<&str, TokenType> = HashMap::from_iter([("and", TokenType::AND)]);
