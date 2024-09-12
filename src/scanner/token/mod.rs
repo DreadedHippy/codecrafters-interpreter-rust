@@ -48,21 +48,21 @@ pub fn keywords() -> &'static HashMap<&'static str, TokenType> {
 	HASHMAP.get_or_init(|| {
 		let mut map = HashMap::new();
 			map.insert("and", TokenType::AND);
-			map.insert("and", TokenType::CLASS);
-			map.insert("and", TokenType::ELSE);
-			map.insert("and", TokenType::FALSE);
-			map.insert("and", TokenType::FOR);
-			map.insert("and", TokenType::FUN);
-			map.insert("and", TokenType::IF);
-			map.insert("and", TokenType::NIL);
-			map.insert("and", TokenType::OR);
-			map.insert("and", TokenType::PRINT);
-			map.insert("and", TokenType::RETURN);
-			map.insert("and", TokenType::SUPER);
-			map.insert("and", TokenType::THIS);
-			map.insert("and", TokenType::TRUE);
-			map.insert("and", TokenType::VAR);
-			map.insert("and", TokenType::WHILE);
+			map.insert("class", TokenType::CLASS);
+			map.insert("else", TokenType::ELSE);
+			map.insert("false", TokenType::FALSE);
+			map.insert("for", TokenType::FOR);
+			map.insert("fun", TokenType::FUN);
+			map.insert("if", TokenType::IF);
+			map.insert("nil", TokenType::NIL);
+			map.insert("or", TokenType::OR);
+			map.insert("print", TokenType::PRINT);
+			map.insert("return", TokenType::RETURN);
+			map.insert("super", TokenType::SUPER);
+			map.insert("this", TokenType::THIS);
+			map.insert("true", TokenType::TRUE);
+			map.insert("var", TokenType::VAR);
+			map.insert("while", TokenType::WHILE);
 
 		map
 	})
