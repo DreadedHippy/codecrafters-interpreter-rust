@@ -2,14 +2,41 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
+use parser::AstPrinter;
+use parser::Expr;
+use parser::ExprBinary;
+use parser::ExprGrouping;
+use parser::ExprLiteral;
+use parser::ExprUnary;
+use scanner::token::Literal;
+use scanner::token::Token;
+use scanner::token::TokenType;
 use scanner::Scanner;
 
 pub mod scanner;
 pub mod utils;
+pub mod parser;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    Lox::main(args);
+    // Lox::main(args);
+
+    // -- Test Parser
+    let expression: Expr = Expr::Binary(
+        ExprBinary::new(
+            Expr::Unary(
+                ExprUnary {
+                    operator: Token::new(TokenType::MINUS, "-".to_string(), Literal::Null, 1),
+                    right: Box::new(Expr::Literal(ExprLiteral::NUMBER(123.0)))
+                }
+            ),
+            Token::new(TokenType::STAR, "*".to_string(), Literal::Null, 1),
+            Expr::Grouping(
+                ExprGrouping(Box::new(Expr::Literal(ExprLiteral::NUMBER(45.67))))
+            ))
+    );
+
+    println!("{}", AstPrinter::print(expression))
 }
 
 
