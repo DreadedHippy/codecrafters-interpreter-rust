@@ -20,7 +20,7 @@ impl std::fmt::Display for Token {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(unused, non_camel_case_types)]
 pub enum TokenType {
   // Single-character tokens.

@@ -38,7 +38,7 @@ impl Scanner {
 		Ok(self.tokens.clone())
 	}
 
-	fn error(&mut self, e: ScannerError) {
+	pub fn error(&mut self, e: ScannerError) {
 		self.had_error = true;
 		e.report("");
 	}
