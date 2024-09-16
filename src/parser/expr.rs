@@ -55,7 +55,7 @@ impl ToString for ExprLiteral {
 			ExprLiteral::STRING(s) => {s.clone()},
 			ExprLiteral::True => {"true".to_string()},
 			ExprLiteral::False => {"false".to_string()},
-			ExprLiteral::Null => {"null".to_string()},
+			ExprLiteral::Null => {"nil".to_string()},
 		}
 	}
 }

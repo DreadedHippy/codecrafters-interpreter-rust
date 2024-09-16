@@ -88,7 +88,7 @@ pub enum Literal {
 impl std::fmt::Display for Literal {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let as_str = match self {
-			Self::Null => "null".to_string(),
+			Self::Null => "nil".to_string(),
 			Self::Integer(x) => x.to_string(),
 			Self::String(s) => s.to_string(),
 			Self::Float(f) => format!("{:?}", f),
