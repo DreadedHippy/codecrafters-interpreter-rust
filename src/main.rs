@@ -76,7 +76,9 @@ impl Lox {
 
         if let Some(e) = expression {
             println!("{}", AstPrinter::print(e));
-        } else {
+        }        
+
+        if scanner.had_error {
             std::process::exit(65);
         }
     }
