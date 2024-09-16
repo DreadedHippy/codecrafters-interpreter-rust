@@ -12,11 +12,11 @@ impl ParserError {
 		Self { token, message }
 	}
 	
-	pub fn error(&mut self) {
+	pub fn error(&self) {
 		if self.token.token_type == TokenType::EOF {
-			self.report("at end")
+			self.report(" at end")
 		} else {
-			self.report(&format!("at '{}'", self.token.lexeme))
+			self.report(&format!(" at '{}'", self.token.lexeme))
 		}
 	}
 

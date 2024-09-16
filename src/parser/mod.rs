@@ -98,7 +98,7 @@ impl Parser {
 			let right = self.factor()?;
 
 			match right {
-				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Literal found on right hand side of binary expression")))},
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Invalid binary expression")))},
 				_ => {}
 			}
 			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
@@ -172,8 +172,8 @@ impl Parser {
 	fn error(&mut self, token: Token, message: String) -> ParserError {
 		self.had_error = true;
 		let error = ParserError::new(token, message);
+		error.error();
 		error
-
 	}
 
 
