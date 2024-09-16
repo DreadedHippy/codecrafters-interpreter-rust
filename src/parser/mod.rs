@@ -96,6 +96,11 @@ impl Parser {
 		while self.match_next(vec![TokenType::MINUS, TokenType::PLUS]) {
 			let operator = self.previous();
 			let right = self.factor()?;
+
+			match right {
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Literal found on right hand side of binary expression")))},
+				_ => {}
+			}
 			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
 		}
 
