@@ -71,10 +71,14 @@ impl Lox {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().expect("Failed to scan tokens");
 
-        let mut parser = Parser::new(tokens);
-        let expression = parser.parse();        
-
         if scanner.had_error {
+            std::process::exit(65);
+        }
+
+        let mut parser = Parser::new(tokens);
+        let expression = parser.parse();
+
+        if expression.is_none() {
             std::process::exit(65);
         }
 
