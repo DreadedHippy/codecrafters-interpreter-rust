@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
+use parser::expr;
 use parser::expr::AstPrinter;
 use parser::Parser;
 use scanner::Scanner;
@@ -10,6 +11,7 @@ pub mod scanner;
 pub mod utils;
 pub mod parser;
 pub mod error;
+pub mod interpreter;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -50,6 +52,15 @@ impl Lox {
                 });
                 
                 Self::parse(file_contents.to_string())
+            },
+            "interpret" => {
+                let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                    writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                    String::new()
+                });
+                
+                Self::interpret(file_contents.to_string())
+
             }
             _ => {
                 writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
@@ -90,6 +101,32 @@ impl Lox {
         if let Some(e) = expression {
             println!("{}", AstPrinter::print(e));
         }
+    }
+
+    pub fn interpret(source: String) {
+        let mut scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens().expect("Failed to scan tokens");
+
+        if scanner.had_error {
+            std::process::exit(65);
+        }
+
+        let mut parser = Parser::new(tokens);
+        let expression = parser.parse();
+
+        if expression.is_none() {
+            std::process::exit(65);
+        }
+
+        let v = expression.unwrap().interpret_self();
+
+        if v.is_none() {
+            std::process::exit(70);
+        }
+
+        let v = v.unwrap();
+
+        println!("{}", v);
     }
 
     
