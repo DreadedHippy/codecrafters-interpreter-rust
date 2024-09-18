@@ -13,7 +13,7 @@ impl ValueError {
 	}
 
 	pub fn error(&self) {
-		println!("{}\n[line {}]", self.message, self.token.line)
+		eprintln!("{}\n[line {}]", self.message, self.token.line)
 	}
 }
 
