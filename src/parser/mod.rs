@@ -1,4 +1,4 @@
-use expr::{Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary};
+use expr::{Expr, ExprLiteral};
 use error::{ParserError, ParserResult};
 
 use crate::scanner::token::{Literal, Token, TokenType};
@@ -34,7 +34,7 @@ impl Parser {
 			let operator = self.previous();
 			let right = self.comparison()?;
 
-			expr = Expr::Binary(ExprBinary::new(expr, operator, right));
+			expr = Expr::new_binary(expr, operator, right);
 		}
 
 		return Ok(expr);
@@ -84,7 +84,8 @@ impl Parser {
 		while self.match_next(vec![TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL]) {
 			let operator = self.previous();
 			let right = self.term()?;
-			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
+
+			expr = Expr::new_binary(expr, operator, right);
 		}
 
 		Ok(expr)
@@ -107,7 +108,8 @@ impl Parser {
 				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Invalid RHS for binary expression")))},
 				_ => {}
 			}
-			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
+
+			expr = Expr::new_binary(expr, operator, right);
 		}
 
 		Ok(expr)
@@ -119,7 +121,8 @@ impl Parser {
 		while self.match_next(vec![TokenType::SLASH, TokenType::STAR]) {
 			let operator = self.previous();
 			let right = self.unary()?;
-			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
+			
+			expr = Expr::new_binary(expr, operator, right);
 		}
 
 		Ok(expr)
@@ -129,7 +132,7 @@ impl Parser {
 		if self.match_next(vec![TokenType::BANG, TokenType::MINUS]) {
 			let operator = self.previous();
 			let right = self.unary()?;
-			return Ok(Expr::Unary(ExprUnary {operator, right: Box::new(right)}))
+			return Ok(Expr::new_unary(operator, right))
 		}
 
 
@@ -160,10 +163,10 @@ impl Parser {
 		if self.match_next(vec![TokenType::LEFT_PAREN]) {
 			let expr = self.expression()?;
 			self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression".to_string())?;
-			return Ok(Expr::Grouping(ExprGrouping(Box::new(expr))))
+			return Ok(Expr::new_grouping(expr));
 		}
 
-		return Ok(Expr::Literal(ExprLiteral::Null))
+		return Ok(Expr::Literal(ExprLiteral::Null));
 
 	}
 
