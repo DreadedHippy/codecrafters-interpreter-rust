@@ -94,11 +94,17 @@ impl Parser {
 		let mut expr = self.factor()?;
 
 		while self.match_next(vec![TokenType::MINUS, TokenType::PLUS]) {
+			// If invalid LHS
+			match expr {
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.previous(), format!("Invalid LHS for binary expression")))},
+				_ => {}
+			}
+
 			let operator = self.previous();
 			let right = self.factor()?;
 
 			match right {
-				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Invalid binary expression")))},
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Invalid RHS for binary expression")))},
 				_ => {}
 			}
 			expr = Expr::Binary(ExprBinary::new(expr, operator, right))
