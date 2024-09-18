@@ -95,6 +95,7 @@ impl Interpret for ExprBinary {
 			},
 			TokenType::SLASH => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
+				if r == 0.0 { return Err(ValueError::new(o, "Denominator cannot be 0"))}
 				Values::Double(l/r)
 			},
 			TokenType::GREATER => {
