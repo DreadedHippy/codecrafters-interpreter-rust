@@ -10,7 +10,7 @@ pub trait Interpret {
 }
 
 impl Expr {
-	pub fn interpret_self(self) -> Option<Values>{
+	pub fn evaluate_self(self) -> Option<Values>{
 		let res = self.interpret();
 
 		match res {

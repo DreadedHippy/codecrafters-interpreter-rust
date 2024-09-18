@@ -2,7 +2,6 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
-use parser::expr;
 use parser::expr::AstPrinter;
 use parser::Parser;
 use scanner::Scanner;
@@ -53,13 +52,13 @@ impl Lox {
                 
                 Self::parse(file_contents.to_string())
             },
-            "interpret" => {
+            "evaluate" => {
                 let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
                     writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
                     String::new()
                 });
                 
-                Self::interpret(file_contents.to_string())
+                Self::evaluate(file_contents.to_string())
 
             }
             _ => {
@@ -103,7 +102,7 @@ impl Lox {
         }
     }
 
-    pub fn interpret(source: String) {
+    pub fn evaluate(source: String) {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens().expect("Failed to scan tokens");
 
@@ -118,7 +117,7 @@ impl Lox {
             std::process::exit(65);
         }
 
-        let v = expression.unwrap().interpret_self();
+        let v = expression.unwrap().evaluate_self();
 
         if v.is_none() {
             std::process::exit(70);
