@@ -19,7 +19,7 @@ impl std::fmt::Display for Values {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let as_str = match self {
 			Values::Boolean(x) => &x.to_string(),
-			Values::Double(x) => &format!("{:?}", x),
+			Values::Double(x) => &format!("{}", x),
 			Values::Nil => "nil",
 			Values::String(x) => &x
 		};
