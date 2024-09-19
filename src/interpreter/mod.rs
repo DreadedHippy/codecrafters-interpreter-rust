@@ -52,8 +52,8 @@ impl Interpreter {
 			TokenType::PLUS => {
 				match (left, right) {
 					(Value::Double(l), Value::Double(r)) => Value::Double(l + r),
-					(Value::Double(l), Value::String(r)) => Value::String(l.to_string() + &r),
-					(Value::String(l), Value::Double(r)) => Value::String(l + &r.to_string()),
+					// (Value::Double(l), Value::String(r)) => Value::String(l.to_string() + &r),
+					// (Value::String(l), Value::Double(r)) => Value::String(l + &r.to_string()),
 					(Value::String(l), Value::String(r)) => Value::String(l + &r),
 					_ => return Err(ValueError::new(o, "Operands can only be numbers or strings"))
 				}
