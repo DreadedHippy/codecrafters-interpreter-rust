@@ -85,8 +85,10 @@ impl Interpret for ExprBinary {
 			TokenType::PLUS => {
 				match (left, right) {
 					(Values::Double(l), Values::Double(r)) => Values::Double(l + r),
+					(Values::Double(l), Values::String(r)) => Values::String(l.to_string() + &r),
+					(Values::String(l), Values::Double(r)) => Values::String(l + &r.to_string()),
 					(Values::String(l), Values::String(r)) => Values::String(l + &r),
-					_ => return Err(ValueError::new(o, "Operands must be two numbers or two strings"))
+					_ => return Err(ValueError::new(o, "Operands can only be numbers or strings"))
 				}
 			},
 			TokenType::STAR => {
