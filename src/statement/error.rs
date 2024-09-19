@@ -4,6 +4,9 @@ use crate::{parser::error::ParserError, scanner::token::{Token, TokenType}};
 pub struct StatementError {token: Token, message: String}
 
 impl StatementError {
+	pub fn new(token: Token, message: &str) -> Self {
+		Self {token, message: message.to_string()}
+	}
 	pub fn error(&self) {
 		if self.token.token_type == TokenType::EOF {
 			self.report(" at end")

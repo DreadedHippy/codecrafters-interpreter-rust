@@ -1,6 +1,8 @@
-use error::StatementResult;
+use std::string::ParseError;
 
-use crate::{interpreter::{error::ValueResult, values::Value, Interpreter}, parser::{expr::Expr, Parser}, scanner::token::{Token, TokenType}};
+use error::{StatementError, StatementResult};
+
+use crate::{interpreter::{error::ValueResult, values::Value, Interpreter}, parser::{error::ParserError, expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
 
 pub mod error;
 pub mod environment;
@@ -113,7 +115,7 @@ impl Parser {
 		while !self.is_at_end() {
 			match self.declaration() {
 				Ok(s) => statements.push(s),
-				Err(_) => {std::process::exit(70)},
+				Err(e) => { e.error(); std::process::exit(65)},
 			}
 		}
 
@@ -156,6 +158,13 @@ impl Parser {
 
 	fn print_statement(&mut self) -> StatementResult<Statement> {
 		let value = self.expression()?;
+
+		match &value {
+			Expr::Literal(ExprLiteral::Null) => {return Err(StatementError::new(self.previous(), "Expect expression after PRINT"))},
+			_ => {}
+		}
+
+
 		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
 		Ok(Statement::Print(value.into()))
 	}
