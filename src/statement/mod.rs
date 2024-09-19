@@ -37,7 +37,7 @@ impl Interpreter {
 
 			match v {
 				Ok(_) => {continue;},
-				Err(_) => {break;}
+				Err(e) => {e.error(); std::process::exit(70);}
 			}
 		}
 	}
