@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
+use interpreter::Interpreter;
 use parser::expr::AstPrinter;
 use parser::Parser;
 use scanner::Scanner;
@@ -11,6 +12,7 @@ pub mod utils;
 pub mod parser;
 pub mod error;
 pub mod interpreter;
+pub mod statement;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -60,6 +62,14 @@ impl Lox {
                 
                 Self::evaluate(file_contents.to_string())
 
+            },
+            "run" => {
+                let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                    writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
+                    String::new()
+                });
+                
+                Self::run(file_contents.to_string())
             }
             _ => {
                 writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
@@ -117,7 +127,9 @@ impl Lox {
             std::process::exit(65);
         }
 
-        let v = expression.unwrap().evaluate_self();
+        let mut interpreter = Interpreter::new();
+
+        let v = interpreter.interpret(expression.unwrap());
 
         if v.is_none() {
             std::process::exit(70);
@@ -127,6 +139,31 @@ impl Lox {
 
         println!("{}", v);
     }
+
+    pub fn run(source: String) {
+        let mut scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens().expect("Failed to scan tokens");
+
+        if scanner.had_error {
+            std::process::exit(65);
+        }
+
+        let mut parser = Parser::new(tokens);
+
+        let statements = parser.parse_statement();
+
+
+
+        match statements {
+            Ok(statements) => {
+                let mut interpreter = Interpreter::new();
+                interpreter.interpret_statements(statements);
+            },
+            Err(_) => {std::process::exit(65);}
+        }
+    }
+
+
 
     
 }

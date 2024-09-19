@@ -1,6 +1,6 @@
-use crate::scanner::token::Token;
+use crate::{scanner::token::Token, statement::environment::error::EnvironmentError};
 
-use super::values::Values;
+use super::values::Value;
 
 pub struct ValueError {
 	pub token: Token,
@@ -17,18 +17,24 @@ impl ValueError {
 	}
 }
 
+impl From<EnvironmentError> for ValueError {
+	fn from(value: EnvironmentError) -> Self {
+		Self {token: value.token, message: value.message}
+	}
+}
+
 pub type ValueResult<T> = Result<T, ValueError>;
 
-pub fn check_number_operand(operator: Token, operand: &Values) -> ValueResult<f64> {
+pub fn check_number_operand(operator: Token, operand: &Value) -> ValueResult<f64> {
 	match operand {
-		Values::Double(n) => Ok(*n),
+		Value::Double(n) => Ok(*n),
 		_ => Err(ValueError::new(operator, "Operand must be a number."))
 	}
 }
 
-pub fn check_number_operands(operator: &Token, left: &Values, right: &Values) -> ValueResult<(f64, f64)> {
+pub fn check_number_operands(operator: &Token, left: &Value, right: &Value) -> ValueResult<(f64, f64)> {
 	match (left, right) {
-		(Values::Double(l), Values::Double(r)) => Ok((*l, *r)),
+		(Value::Double(l), Value::Double(r)) => Ok((*l, *r)),
 		_ => Err(ValueError::new(operator.clone(), "Operands must be a numbers."))
 	}
 }

@@ -1,27 +1,27 @@
-#[derive(PartialEq)]
-pub enum Values {
+#[derive(PartialEq, Clone)]
+pub enum Value {
 	Double(f64),
 	Nil,
 	Boolean(bool),
 	String(String)
 }
 
-impl Values {
+impl Value {
 	pub fn is_truthy(&self) -> bool {
 		match self {
-			Values::Boolean(false) | Values::Nil => false,
+			Value::Boolean(false) | Value::Nil => false,
 			_ => true
 		}
 	}
 }
 
-impl std::fmt::Display for Values {
+impl std::fmt::Display for Value {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let as_str = match self {
-			Values::Boolean(x) => &x.to_string(),
-			Values::Double(x) => &format!("{}", x),
-			Values::Nil => "nil",
-			Values::String(x) => &x
+			Value::Boolean(x) => &x.to_string(),
+			Value::Double(x) => &format!("{}", x),
+			Value::Nil => "nil",
+			Value::String(x) => &x
 		};
 
 		write!(f, "{}", as_str)

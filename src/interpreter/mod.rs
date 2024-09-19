@@ -1,126 +1,146 @@
 use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
-use values::Values;
+use values::Value;
 
-use crate::{parser::expr::{Expr, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary}, scanner::token::TokenType};
+use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
 
 pub mod values;
 pub mod error;
-pub trait Interpret {
-	fn interpret(self) -> ValueResult<Values>;
+
+pub struct Interpreter {
+	pub environment: Environment
 }
 
-impl Expr {
-	pub fn evaluate_self(self) -> Option<Values>{
-		let res = self.interpret();
+impl Interpreter {
+	pub fn new() -> Self {
+		Self {environment: Environment::default()}
+	}
+}
+impl Interpreter {
+	pub fn interpret(&mut self, expr: Expr) -> Option<Value>{
+		let res = self.interpret_expr(expr);
 
 		match res {
 			Ok(e) => {Some(e)},
 			Err(e) => {e.error(); None}
 		}
 	}
-}
 
-impl Interpret for Expr {
-	fn interpret(self) -> ValueResult<Values> {
-		match self {
-			Expr::Binary(x) => {x.interpret()},
-			Expr::Literal(x) => {x.interpret()},
-			Expr::Unary(x) => {x.interpret()},
-			Expr::Grouping(x) => {x.interpret()},
+	pub fn interpret_expr(&mut self, expr: Expr) -> ValueResult<Value> {
+		match expr {
+			Expr::Binary(x) => {self.interpret_expr_binary(x)},
+			Expr::Literal(x) => {self.interpret_expr_literal(x)},
+			Expr::Unary(x) => {self.interpret_expr_unary(x)},
+			Expr::Grouping(x) => {self.interpret_expr_grouping(x)},
+			Expr::Variable(x) => {Ok(self.environment.get(x.name)?)},
+			Expr::Assignment(x) => {self.interpret_expr_assignment(x)}
 		}
-
 	}
 }
 
-impl Interpret for ExprLiteral {
-	fn interpret(self) -> ValueResult<Values> {
-		let v = match self {
-			ExprLiteral::True => Values::Boolean(true),
-			ExprLiteral::False => Values::Boolean(false),
-			ExprLiteral::NUMBER(n) => Values::Double(n),
-			ExprLiteral::STRING(s) => Values::String(s),
-			ExprLiteral::Null => Values::Nil,
-		};
-
-		Ok(v)
-	}
-}
-
-impl Interpret for ExprGrouping {
-	fn interpret(self) -> ValueResult<Values> {
-		return self.0.interpret();
-	}
-}
-
-
-impl Interpret for ExprUnary {
-	fn interpret(self) -> ValueResult<Values> {
-		let right = self.right.interpret()?;
-		let o = self.operator;
-
-		let v = match o.token_type {
-			TokenType::MINUS=> {
-				let n = check_number_operand(o, &right)?;
-				Values::Double(-n)
-			},
-			TokenType::BANG => { Values::Boolean(!right.is_truthy()) }
-			_ => Values::Nil
-		};
-
-		Ok(v)
-	}
-}
-
-impl Interpret for ExprBinary {
-	fn interpret(self) -> ValueResult<Values> {
-		let left = self.left.interpret()?;
-		let right = self.right.interpret()?;
-		let o = self.operator;
+/// for ExprBinary
+impl Interpreter {
+	pub fn interpret_expr_binary(&mut self, expr: ExprBinary) -> ValueResult<Value> {
+		let left = self.interpret_expr(*expr.left)?;
+		let right = self.interpret_expr(*expr.right)?;
+		let o = expr.operator;
 
 		let v = match o.token_type {
 			TokenType::MINUS => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Double(l - r)
+				Value::Double(l - r)
 			},
 			TokenType::PLUS => {
 				match (left, right) {
-					(Values::Double(l), Values::Double(r)) => Values::Double(l + r),
-					(Values::Double(l), Values::String(r)) => Values::String(l.to_string() + &r),
-					(Values::String(l), Values::Double(r)) => Values::String(l + &r.to_string()),
-					(Values::String(l), Values::String(r)) => Values::String(l + &r),
+					(Value::Double(l), Value::Double(r)) => Value::Double(l + r),
+					(Value::Double(l), Value::String(r)) => Value::String(l.to_string() + &r),
+					(Value::String(l), Value::Double(r)) => Value::String(l + &r.to_string()),
+					(Value::String(l), Value::String(r)) => Value::String(l + &r),
 					_ => return Err(ValueError::new(o, "Operands can only be numbers or strings"))
 				}
 			},
 			TokenType::STAR => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Double(l * r)
+				Value::Double(l * r)
 			},
 			TokenType::SLASH => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
 				if r == 0.0 { return Err(ValueError::new(o, "Denominator cannot be 0"))}
-				Values::Double(l/r)
+				Value::Double(l/r)
 			},
 			TokenType::GREATER => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Boolean(l > r)
+				Value::Boolean(l > r)
 			},
 			TokenType::GREATER_EQUAL => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Boolean(l >= r)
+				Value::Boolean(l >= r)
 			},
 			TokenType::LESS => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Boolean(l < r)
+				Value::Boolean(l < r)
 			},
 			TokenType::LESS_EQUAL => {
 				let (l, r) = check_number_operands(&o, &left, &right)?;
-				Values::Boolean(l <= r)
+				Value::Boolean(l <= r)
 			},
-			TokenType::BANG_EQUAL => Values::Boolean(!left.eq(&right)),
-			TokenType::EQUAL_EQUAL => Values::Boolean(left.eq(&right)),
-			_ => Values::Nil
+			TokenType::BANG_EQUAL => Value::Boolean(!left.eq(&right)),
+			TokenType::EQUAL_EQUAL => Value::Boolean(left.eq(&right)),
+			_ => Value::Nil
 		};
 
 		Ok(v)
 	}
+}
+
+
+impl Interpreter{
+	pub fn interpret_expr_literal(&mut self, expr: ExprLiteral) -> ValueResult<Value> {
+		let v = match expr {
+			ExprLiteral::True => Value::Boolean(true),
+			ExprLiteral::False => Value::Boolean(false),
+			ExprLiteral::NUMBER(n) => Value::Double(n),
+			ExprLiteral::STRING(s) => Value::String(s),
+			ExprLiteral::Null => Value::Nil,
+		};
+
+		Ok(v)
+	}
+}
+
+impl Interpreter {
+	pub fn interpret_expr_grouping(&mut self, expr: ExprGrouping) -> ValueResult<Value> {
+		return self.interpret_expr(*expr.0);
+	}
+}
+
+
+impl Interpreter {
+	pub fn interpret_expr_unary(&mut self, expr: ExprUnary) -> ValueResult<Value> {
+		let right = self.interpret_expr(*expr.right)?;
+		let o = expr.operator;
+
+		let v = match o.token_type {
+			TokenType::MINUS=> {
+				let n = check_number_operand(o, &right)?;
+				Value::Double(-n)
+			},
+			TokenType::BANG => { Value::Boolean(!right.is_truthy()) }
+			_ => Value::Nil
+		};
+
+		Ok(v)
+	}
+}
+
+impl Interpreter {
+	pub fn interpret_expr_assignment(&mut self, expr: ExprAssignment) -> ValueResult<Value> {
+		let value = self.interpret_expr(*expr.value)?;
+
+		self.environment.assign(expr.name, value.clone())?;
+		Ok(value)
+	}
+}
+
+pub trait Interpret {
+	fn interpret(self) -> ValueResult<Value>;
 }

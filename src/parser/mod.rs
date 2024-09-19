@@ -23,11 +23,30 @@ impl Parser {
 		self.expression().ok()
 	}
 
-	fn expression(&mut self) -> ParserResult<Expr> {
-		return self.equality()
+	pub fn expression(&mut self) -> ParserResult<Expr> {
+		return self.assignment()
 	}
 
-	fn equality(&mut self) -> ParserResult<Expr> {
+	pub fn assignment(&mut self) -> ParserResult<Expr> {
+		let expr = self.equality()?;
+
+		if self.match_next(vec![TokenType::EQUAL]) {
+			let equals = self.previous();
+			let value = self.assignment()?;
+
+			match expr {
+				Expr::Variable(v) => {
+					let name = v.name;
+					return Ok(Expr::new_assignment(name, value))
+				},
+				_ => return Err(ParserError::new(equals, "Invalid assignment target".to_string()))
+			}
+		}
+
+		Ok(expr)
+	}
+
+	pub fn equality(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.comparison()?;
 
 		while self.match_next(vec![TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
@@ -40,7 +59,7 @@ impl Parser {
 		return Ok(expr);
 	}
 
-	fn match_next(&mut self, token_types: Vec<TokenType>) -> bool {
+	pub fn match_next(&mut self, token_types: Vec<TokenType>) -> bool {
 		for token_type in token_types {
 			if self.check(token_type) {
 				self.advance();
@@ -51,7 +70,7 @@ impl Parser {
 		return false
 	}
 
-	fn advance(&mut self) -> Token {
+	pub fn advance(&mut self) -> Token {
 		if !self.is_at_end() {
 			self.current += 1;
 		}
@@ -59,26 +78,26 @@ impl Parser {
 	}
 
 
-	fn check(&self, token_type: TokenType) -> bool {
+	pub fn check(&self, token_type: TokenType) -> bool {
 		if self.is_at_end() {return false}
 		return self.peek().token_type == token_type
 	}
 
-	fn is_at_end(&self) -> bool {
+	pub fn is_at_end(&self) -> bool {
 		self.peek().token_type == TokenType::EOF
 	}
 
-	fn peek(&self) -> Token {
+	pub fn peek(&self) -> Token {
 		return self.tokens.get(self.current).unwrap().clone()
 	}
 
-	fn previous(&self) -> Token {
+	pub fn previous(&self) -> Token {
 		return self.tokens.get(self.current - 1).unwrap().clone()
 	}
 
 
 	// Comparison
-	fn comparison(&mut self) -> ParserResult<Expr> {
+	pub fn comparison(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.term()?;
 
 		while self.match_next(vec![TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL]) {
@@ -91,7 +110,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	fn term(&mut self) -> ParserResult<Expr> {
+	pub fn term(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.factor()?;
 
 		while self.match_next(vec![TokenType::MINUS, TokenType::PLUS]) {
@@ -115,7 +134,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	fn factor(&mut self) -> ParserResult<Expr> {
+	pub fn factor(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.unary()?;
 
 		while self.match_next(vec![TokenType::SLASH, TokenType::STAR]) {
@@ -128,7 +147,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	fn unary(&mut self) -> ParserResult<Expr> {
+	pub fn unary(&mut self) -> ParserResult<Expr> {
 		if self.match_next(vec![TokenType::BANG, TokenType::MINUS]) {
 			let operator = self.previous();
 			let right = self.unary()?;
@@ -139,7 +158,7 @@ impl Parser {
 		return self.primary()
 	}
 
-	fn primary(&mut self) -> ParserResult<Expr> {
+	pub fn primary(&mut self) -> ParserResult<Expr> {
 		if self.match_next(vec![TokenType::FALSE]) {return Ok(Expr::Literal(ExprLiteral::False))}
 		if self.match_next(vec![TokenType::TRUE]) {return Ok(Expr::Literal(ExprLiteral::True))}
 		if self.match_next(vec![TokenType::NIL]) {return Ok(Expr::Literal(ExprLiteral::Null))}
@@ -160,6 +179,10 @@ impl Parser {
 			return Ok(Expr::Literal(ExprLiteral::STRING(v)))
 		}
 
+		if self.match_next(vec![TokenType::IDENTIFIER]) {
+			return Ok(Expr::new_variable(self.previous()))
+		}
+
 		if self.match_next(vec![TokenType::LEFT_PAREN]) {
 			let expr = self.expression()?;
 			self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression".to_string())?;
@@ -170,7 +193,7 @@ impl Parser {
 
 	}
 
-	fn consume(&mut self, token_type: TokenType, message: String) -> ParserResult<Token> {
+	pub fn consume(&mut self, token_type: TokenType, message: String) -> ParserResult<Token> {
 		if self.check(token_type) {
 			return Ok(self.advance())
 		}
@@ -178,19 +201,28 @@ impl Parser {
 		return Err(self.error(self.peek(), message))
 	}
 
-	fn error(&mut self, token: Token, message: String) -> ParserError {
+	pub fn error(&mut self, token: Token, message: String) -> ParserError {
 		self.had_error = true;
 		let error = ParserError::new(token, message);
 		error.error();
 		error
 	}
 
+	pub fn synchronize(&mut self) {
+		self.advance();
 
+		while !self.is_at_end() {
+			if self.previous().token_type == TokenType::SEMICOLON {return}
 
+			match self.peek().token_type {
+				TokenType::CLASS | TokenType::FUN | TokenType::VAR
+				| TokenType::FOR | TokenType::IF | TokenType::WHILE
+				| TokenType::PRINT | TokenType::RETURN  => return,
+				_ => {}
+			}
 
-
-
-
-
+			self.advance();
+		}
+	}
 
 }

@@ -5,6 +5,8 @@ pub enum Expr {
 	Unary(ExprUnary),
 	Binary(ExprBinary),
 	Grouping(ExprGrouping),
+	Variable(ExprVariable),
+	Assignment(ExprAssignment),
 }
 
 impl ExprAccept for Expr {
@@ -14,6 +16,8 @@ impl ExprAccept for Expr {
 			Expr::Unary(u) => u.accept(),
 			Expr::Binary(b) => b.accept(),
 			Expr::Grouping(g) => g.accept(),
+			Expr::Variable(v) => v.accept(),
+			Expr::Assignment(a) => a.accept(),
 		}
 	}
 }
@@ -60,6 +64,14 @@ impl Expr {
 		Expr::Grouping(ExprGrouping(Box::new(expr)))
 	}
 
+	pub fn new_variable(name: Token) -> Expr {
+		Expr::Variable(ExprVariable {name})
+	}
+
+	pub fn new_assignment(name: Token, value: Expr) -> Expr {
+		Expr::Assignment(ExprAssignment {name, value: Box::new(value)})
+	}
+
 }
 
 impl ToString for ExprLiteral {
@@ -86,6 +98,15 @@ pub struct ExprBinary {
 	pub left: Box<Expr>,
 	pub operator: Token,
 	pub right: Box<Expr>
+}
+
+pub struct ExprVariable {
+	pub name: Token
+}
+
+pub struct ExprAssignment {
+	pub name: Token,
+	pub value: Box<Expr>
 }
 
 impl ExprBinary {
@@ -119,6 +140,18 @@ impl ExprAccept for ExprLiteral {
 impl ExprAccept for ExprGrouping {
 	fn accept(self) -> String {
 		Expr::parenthesize("group".to_string(), vec![*self.0])
+	}
+}
+
+impl ExprAccept for ExprVariable {
+	fn accept(self) -> String {
+		self.name.to_string()
+	}
+}
+
+impl ExprAccept for ExprAssignment {
+	fn accept(self) -> String {
+		String::new()
 	}
 }
 
