@@ -1,8 +1,6 @@
-use std::string::ParseError;
-
 use error::{StatementError, StatementResult};
 
-use crate::{interpreter::{error::ValueResult, values::Value, Interpreter}, parser::{error::ParserError, expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
+use crate::{interpreter::{error::ValueResult, values::Value, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
 
 pub mod error;
 pub mod environment;
@@ -11,9 +9,13 @@ pub mod environment;
 // 	VarDecl(VarDeclaration),
 // 	StmtDecl(StatementError)
 // }
+#[derive(Clone)]
 pub enum Statement {
 	Print(PrintStatement),
 	Expression(ExprStatement),
+	If(IfStatement),
+	While(WhileStatement),
+	// For(ForStatement),
 	Var(VarDeclaration),
 	Block(BlockStatement)
 }
@@ -24,10 +26,18 @@ impl Statement {
 	}
 }
 
+#[derive(Clone)]
 pub struct PrintStatement(Expr);
+#[derive(Clone)]
 pub struct ExprStatement(Expr);
 
+#[derive(Clone)]
+pub struct IfStatement{condition: Expr, then_branch: Box<Statement>, else_branch: Option<Box<Statement>>}
+#[derive(Clone)]
+pub struct WhileStatement{condition: Expr, body: Box<Statement>}
+#[derive(Clone)]
 pub struct BlockStatement{statements: Vec<Statement>}
+#[derive(Clone)]
 pub struct VarDeclaration{name: Token, initializer: Option<Expr>}
 
 impl Interpreter {
@@ -49,7 +59,9 @@ impl Interpreter {
 			Statement::Expression(e) => {self.interpret_expr_statement(e)},
 			Statement::Print(p) => {self.interpret_print_statement(p)},
 			Statement::Var(v) => {self.interpret_var_statement(v)},
-			Statement::Block(b) => {self.interpret_block_statement(b)}
+			Statement::Block(b) => {self.interpret_block_statement(b)},
+			Statement::If(i) => {self.interpret_if_statement(i)},
+			Statement::While(w) => {self.interpret_while_statement(w)},
 		}
 	}
 
@@ -90,6 +102,26 @@ impl Interpreter {
 
 		self.environment = self.environment.get_enclosing();
 
+
+		Ok(())
+	}
+
+	pub fn interpret_if_statement(&mut self, s: IfStatement) -> ValueResult<()> {
+		if self.interpret_expr(s.condition)?.is_truthy() {
+			self.interpret_statement(*s.then_branch)?
+		} else {
+			if let Some(statement) = s.else_branch {
+				self.interpret_statement(*statement)?
+			}
+		}
+
+		Ok(())
+	}
+
+	pub fn interpret_while_statement(&mut self, s: WhileStatement) -> ValueResult<()> {
+		while self.interpret_expr(s.condition.clone())?.is_truthy() {
+			self.interpret_statement(*s.body.clone())?
+		}
 
 		Ok(())
 	}
@@ -149,6 +181,18 @@ impl Parser {
 			return self.print_statement()
 		}
 
+		if self.match_next(vec![TokenType::IF]) {
+			return self.if_statement()
+		}
+
+		if self.match_next(vec![TokenType::WHILE]) {
+			return self.while_statement()
+		}
+
+		if self.match_next(vec![TokenType::FOR]) {
+			return self.for_statement()
+		}
+
 		if self.match_next(vec![TokenType::LEFT_BRACE]) {
 			return self.block_statement()
 		}
@@ -185,6 +229,86 @@ impl Parser {
 		let value = self.expression()?;
 		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
 		Ok(Statement::Expression(value.into()))
+	}
+
+	fn if_statement(&mut self) -> StatementResult<Statement> {
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.".to_string())?;
+
+		let condition = self.expression()?;
+
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'if' condition".to_string())?;
+
+		let then_branch = Box::new(self.statement()?);
+		let mut else_branch = None;
+
+		if self.match_next(vec![TokenType::ELSE]) {
+			else_branch = Some(Box::new(self.statement()?))
+		}
+
+		Ok(Statement::If(IfStatement {condition, then_branch, else_branch}))
+	}
+
+	fn while_statement(&mut self) -> StatementResult<Statement> {
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.".to_string())?;
+
+		let condition = self.expression()?;
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'while' condition.".to_string())?;
+
+		let body = Box::new(self.statement()?);
+
+		Ok(Statement::While(WhileStatement {condition, body}))
+	}
+
+	fn for_statement(&mut self) -> StatementResult<Statement> {
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.".to_string())?;
+
+		let initializer = if self.match_next(vec![TokenType::SEMICOLON]) {
+			None
+		} else if self.match_next(vec![TokenType::VAR]) {
+			Some(self.var_declaration()?)
+		} else {
+			Some(self.expression_statement()?)
+		};
+
+		let mut condition = None;
+
+		if !self.check(TokenType::SEMICOLON) {
+			condition = Some(self.expression()?);
+		}
+		self.consume(TokenType::SEMICOLON, "Expect ';' after loop condition".to_string())?;
+
+
+		let mut increment = None;
+
+		if !self.check(TokenType::RIGHT_PAREN) {
+			increment = Some(self.expression()?)
+		}
+
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'for' clauses".to_string())?;
+
+		let mut body = self.statement()?;
+
+		if let Some(increment) = increment {
+			body = Statement::Block(
+				BlockStatement {
+					statements: vec![body, Statement::Expression(ExprStatement(increment))]
+				}) 
+		}
+
+		if condition.is_none() {
+			condition = Some(Expr::Literal(ExprLiteral::True))
+		}
+
+		body = Statement::While(WhileStatement { condition: condition.expect("Condition is 'None', this shouldn't happen"), body: Box::new(body) });
+
+		if let Some(initializer) = initializer {
+			body = Statement::Block(
+				BlockStatement {
+					statements: vec![initializer, body]
+				}) 
+		}
+
+		return Ok(body);
 	}
 
 

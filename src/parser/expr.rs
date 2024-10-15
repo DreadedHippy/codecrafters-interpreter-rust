@@ -1,5 +1,6 @@
 use crate::scanner::token::Token;
 
+#[derive(Clone)]
 pub enum Expr {
 	Literal(ExprLiteral),
 	Unary(ExprUnary),
@@ -7,6 +8,7 @@ pub enum Expr {
 	Grouping(ExprGrouping),
 	Variable(ExprVariable),
 	Assignment(ExprAssignment),
+	Logical(ExprLogical),
 }
 
 impl ExprAccept for Expr {
@@ -18,6 +20,7 @@ impl ExprAccept for Expr {
 			Expr::Grouping(g) => g.accept(),
 			Expr::Variable(v) => v.accept(),
 			Expr::Assignment(a) => a.accept(),
+			Expr::Logical(l) => l.accept(),
 		}
 	}
 }
@@ -43,6 +46,7 @@ impl Expr {
 	}
 }
 
+#[derive(Clone)]
 pub enum ExprLiteral {
 	NUMBER(f64),
 	STRING(String),
@@ -87,23 +91,35 @@ impl ToString for ExprLiteral {
 	}
 }
 
+#[derive(Clone)]
 pub struct ExprGrouping(pub Box<Expr>);
 
+#[derive(Clone)]
 pub struct ExprUnary {
 	pub operator: Token,
 	pub right: Box<Expr>
 }
 
+#[derive(Clone)]
 pub struct ExprBinary {
 	pub left: Box<Expr>,
 	pub operator: Token,
 	pub right: Box<Expr>
 }
 
+#[derive(Clone)]
+pub struct ExprLogical {
+	pub left: Box<Expr>,
+	pub operator: Token,
+	pub right: Box<Expr>
+}
+
+#[derive(Clone)]
 pub struct ExprVariable {
 	pub name: Token
 }
 
+#[derive(Clone)]
 pub struct ExprAssignment {
 	pub name: Token,
 	pub value: Box<Expr>
@@ -134,6 +150,12 @@ impl ExprAccept for ExprUnary {
 impl ExprAccept for ExprLiteral {
 	fn accept(self) -> String {
 		self.to_string()
+	}
+}
+
+impl ExprAccept for ExprLogical {
+	fn accept(self) -> String {
+		Expr::parenthesize(self.operator.lexeme, vec![*self.left, *self.right])
 	}
 }
 

@@ -1,4 +1,4 @@
-use expr::{Expr, ExprLiteral};
+use expr::{Expr, ExprLiteral, ExprLogical};
 use error::{ParserError, ParserResult};
 
 use crate::scanner::token::{Literal, Token, TokenType};
@@ -28,7 +28,7 @@ impl Parser {
 	}
 
 	pub fn assignment(&mut self) -> ParserResult<Expr> {
-		let expr = self.equality()?;
+		let expr = self.or()?;
 
 		if self.match_next(vec![TokenType::EQUAL]) {
 			let equals = self.previous();
@@ -41,6 +41,32 @@ impl Parser {
 				},
 				_ => return Err(ParserError::new(equals, "Invalid assignment target".to_string()))
 			}
+		}
+
+		Ok(expr)
+	}
+
+	pub fn or(&mut self) -> ParserResult<Expr> {
+		let mut expr = self.and()?;
+
+		while self.match_next(vec![TokenType::OR]) {
+			let operator = self.previous();
+			let right = Box::new(self.and()?);
+
+			expr = Expr::Logical(ExprLogical { left: Box::new(expr), operator, right});
+		}
+
+		Ok(expr)
+	}
+
+	pub fn and(&mut self) -> ParserResult<Expr> {
+		let mut expr = self.equality()?;
+
+		while self.match_next(vec![TokenType::AND]) {
+			let operator = self.previous();
+			let right = Box::new(self.equality()?);
+
+			expr = Expr::Logical(ExprLogical {left: Box::new(expr), operator, right});
 		}
 
 		Ok(expr)

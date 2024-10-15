@@ -1,7 +1,7 @@
 use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
 use values::Value;
 
-use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprGrouping, ExprLiteral, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
+use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
 
 pub mod values;
 pub mod error;
@@ -27,12 +27,13 @@ impl Interpreter {
 
 	pub fn interpret_expr(&mut self, expr: Expr) -> ValueResult<Value> {
 		match expr {
+			Expr::Assignment(x) => {self.interpret_expr_assignment(x)}
 			Expr::Binary(x) => {self.interpret_expr_binary(x)},
 			Expr::Literal(x) => {self.interpret_expr_literal(x)},
 			Expr::Unary(x) => {self.interpret_expr_unary(x)},
 			Expr::Grouping(x) => {self.interpret_expr_grouping(x)},
+			Expr::Logical(x) => {self.interpret_expr_logical(x)},
 			Expr::Variable(x) => {Ok(self.environment.get(x.name)?)},
-			Expr::Assignment(x) => {self.interpret_expr_assignment(x)}
 		}
 	}
 }
@@ -138,6 +139,20 @@ impl Interpreter {
 
 		self.environment.assign(expr.name, value.clone())?;
 		Ok(value)
+	}
+}
+
+impl Interpreter {
+	pub fn interpret_expr_logical(&mut self, expr: ExprLogical) -> ValueResult<Value> {
+		let left = self.interpret_expr(*expr.left)?;
+
+		if expr.operator.token_type == TokenType::OR {
+			if left.is_truthy() {return Ok(left)}
+		} else {
+			if !left.is_truthy() {return Ok(left)}
+		}
+
+		return self.interpret_expr(*expr.right);
 	}
 }
 
