@@ -9,12 +9,13 @@ pub mod error;
 pub struct Parser {
 	pub tokens: Vec<Token>,
 	current: usize,
-	had_error: bool
+	had_error: bool,
+	pub loop_depth: usize,
 }
 
 impl Parser {
 	pub fn new(tokens: Vec<Token>) -> Self {
-		Parser {tokens, current: 0, had_error: false}
+		Parser {tokens, current: 0, had_error: false, loop_depth: 0}
 	}
 }
 

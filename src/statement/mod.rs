@@ -1,6 +1,6 @@
 use error::{StatementError, StatementResult};
 
-use crate::{interpreter::{error::ValueResult, values::Value, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
+use crate::{interpreter::{error::{ValueError, ValueResult}, values::Value, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
 
 pub mod error;
 pub mod environment;
@@ -15,7 +15,7 @@ pub enum Statement {
 	Expression(ExprStatement),
 	If(IfStatement),
 	While(WhileStatement),
-	// For(ForStatement),
+	Break(),
 	Var(VarDeclaration),
 	Block(BlockStatement)
 }
@@ -62,6 +62,7 @@ impl Interpreter {
 			Statement::Block(b) => {self.interpret_block_statement(b)},
 			Statement::If(i) => {self.interpret_if_statement(i)},
 			Statement::While(w) => {self.interpret_while_statement(w)},
+			Statement::Break() => {self.interpret_break_statement()},
 		}
 	}
 
@@ -120,10 +121,21 @@ impl Interpreter {
 
 	pub fn interpret_while_statement(&mut self, s: WhileStatement) -> ValueResult<()> {
 		while self.interpret_expr(s.condition.clone())?.is_truthy() {
-			self.interpret_statement(*s.body.clone())?
+			let v = self.interpret_statement(*s.body.clone());
+
+
+			match v {
+				Err(ValueError::Break) => break,
+				k => k?
+			}
+
 		}
 
 		Ok(())
+	}
+
+	pub fn interpret_break_statement(&mut self) -> ValueResult<()> {
+		Err(ValueError::Break)
 	}
 }
 
@@ -193,6 +205,10 @@ impl Parser {
 			return self.for_statement()
 		}
 
+		if self.match_next(vec![TokenType::BREAK]) {
+			return self.break_statement()
+		}
+
 		if self.match_next(vec![TokenType::LEFT_BRACE]) {
 			return self.block_statement()
 		}
@@ -248,13 +264,27 @@ impl Parser {
 		Ok(Statement::If(IfStatement {condition, then_branch, else_branch}))
 	}
 
+	/// Parse a while statement
 	fn while_statement(&mut self) -> StatementResult<Statement> {
 		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.".to_string())?;
 
 		let condition = self.expression()?;
 		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'while' condition.".to_string())?;
 
+
+		// Pre parse
+		self.loop_depth += 1;
+
+		// region:    --- Parse
+		
+		
 		let body = Box::new(self.statement()?);
+		
+		
+		// endregion: --- Parse
+		
+		// Post-parse
+		self.loop_depth -= 1;
 
 		Ok(Statement::While(WhileStatement {condition, body}))
 	}
@@ -286,6 +316,11 @@ impl Parser {
 
 		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'for' clauses".to_string())?;
 
+		// Pre-parse
+		self.loop_depth += 1;
+
+		// Parsing the loop
+
 		let mut body = self.statement()?;
 
 		if let Some(increment) = increment {
@@ -308,26 +343,24 @@ impl Parser {
 				}) 
 		}
 
+		// End of parse
+
+		// Post-parse
+		self.loop_depth -= 1;
+
 		return Ok(body);
 	}
 
+	fn break_statement(&mut self) -> StatementResult<Statement> {
+		if self.loop_depth == 0 {
+			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'break'."))
+		}
+
+		self.consume(TokenType::SEMICOLON, "Expect ';' after 'break.".to_string())?;
+		return Ok(Statement::Break())
+	}
+
+
+
 
 }
-
-// impl Interpret for Statement{
-// 	fn interpret(self) -> ValueResult<Value> {
-// 		match self {
-// 			Self::Expression(e) => e.0.interpret(),
-// 			Self::Print(e) => {
-// 				let v = e.0.interpret();
-// 				if let Ok(v) = &v {
-// 					println!("{}", v);
-// 				}
-// 				v
-// 			},
-// 			Self::Var(v) => {
-// 				v.initializer.interpret()
-// 			}
-// 		}
-// 	}
-// }

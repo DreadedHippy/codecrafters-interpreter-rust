@@ -2,24 +2,27 @@ use crate::{scanner::token::Token, statement::environment::error::EnvironmentErr
 
 use super::values::Value;
 
-pub struct ValueError {
-	pub token: Token,
-	pub message: String
+pub enum ValueError {
+	Break,
+	Std {token: Token, message: String},
 }
 
 impl ValueError {
 	pub fn new(token: Token, message: &str) -> Self {
-		Self {token, message: message.to_string()}
+		Self::Std {token, message: message.to_string()}
 	}
 
 	pub fn error(&self) {
-		eprintln!("{}\n[line {}]", self.message, self.token.line)
+		match self {
+			Self::Std { token, message } => eprintln!("{}\n[line {}]", message, token.line),
+			Self::Break => eprintln!("'BREAK' value error detected")
+		}
 	}
 }
 
 impl From<EnvironmentError> for ValueError {
 	fn from(value: EnvironmentError) -> Self {
-		Self {token: value.token, message: value.message}
+		Self::Std {token: value.token, message: value.message}
 	}
 }
 

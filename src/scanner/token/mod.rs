@@ -38,7 +38,7 @@ pub enum TokenType {
 
   // Keywords.
   AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
-  PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
+  PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE, BREAK,
 
   EOF
 }
@@ -48,6 +48,7 @@ pub fn keywords() -> &'static HashMap<&'static str, TokenType> {
 	HASHMAP.get_or_init(|| {
 		let mut map = HashMap::new();
 			map.insert("and", TokenType::AND);
+			map.insert("break", TokenType::BREAK);
 			map.insert("class", TokenType::CLASS);
 			map.insert("else", TokenType::ELSE);
 			map.insert("false", TokenType::FALSE);
