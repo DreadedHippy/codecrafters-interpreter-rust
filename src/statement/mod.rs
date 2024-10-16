@@ -16,6 +16,7 @@ pub enum Statement {
 	If(IfStatement),
 	While(WhileStatement),
 	Break(),
+	Continue(),
 	Var(VarDeclaration),
 	Block(BlockStatement)
 }
@@ -63,6 +64,7 @@ impl Interpreter {
 			Statement::If(i) => {self.interpret_if_statement(i)},
 			Statement::While(w) => {self.interpret_while_statement(w)},
 			Statement::Break() => {self.interpret_break_statement()},
+			Statement::Continue() => {self.interpret_continue_statement()},
 		}
 	}
 
@@ -126,6 +128,7 @@ impl Interpreter {
 
 			match v {
 				Err(ValueError::Break) => break,
+				Err(ValueError::Continue) => continue,
 				k => k?
 			}
 
@@ -136,6 +139,10 @@ impl Interpreter {
 
 	pub fn interpret_break_statement(&mut self) -> ValueResult<()> {
 		Err(ValueError::Break)
+	}
+
+	pub fn interpret_continue_statement(&mut self) -> ValueResult<()> {
+		Err(ValueError::Continue)
 	}
 }
 
@@ -207,6 +214,10 @@ impl Parser {
 
 		if self.match_next(vec![TokenType::BREAK]) {
 			return self.break_statement()
+		}
+
+		if self.match_next(vec![TokenType::CONTINUE]) {
+			return self.continue_statement()
 		}
 
 		if self.match_next(vec![TokenType::LEFT_BRACE]) {
@@ -359,6 +370,16 @@ impl Parser {
 		self.consume(TokenType::SEMICOLON, "Expect ';' after 'break.".to_string())?;
 		return Ok(Statement::Break())
 	}
+
+	fn continue_statement(&mut self) -> StatementResult<Statement> {
+		if self.loop_depth == 0 {
+			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'continue'."))
+		}
+
+		self.consume(TokenType::SEMICOLON, "Expect ';' after 'continue.".to_string())?;
+		return Ok(Statement::Continue())
+	}
+
 
 
 
