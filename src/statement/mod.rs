@@ -176,8 +176,6 @@ impl Interpreter {
 
 		self.environment.define(function_name, Value::Function(function));
 
-		println!("Function defined");
-
 		Ok(())
 	}
 }

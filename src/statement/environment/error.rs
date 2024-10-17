@@ -1,6 +1,7 @@
 
 use crate::{parser::error::ParserError, scanner::token::{Token, TokenType}};
 
+/// Errors resulting from operations with Environment
 pub struct EnvironmentError {pub token: Token, pub message: String}
 
 impl EnvironmentError {
@@ -23,6 +24,7 @@ impl EnvironmentError {
 	}
 }
 
+/// Wrapper Type for `Result<T, EnvironmentError>`
 pub type EnvironmentResult<T> = Result<T, EnvironmentError>;
 
 impl From<ParserError> for EnvironmentError {

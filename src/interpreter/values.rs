@@ -85,15 +85,12 @@ impl Callable for LoxFunction {
 
 	fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> ValueResult<Value> {
 		let mut environment = interpreter.globals.create_cloned_inner();
-		println!("{:?}", self.declaration.name);
 
 		for i in 0..self.declaration.params.len() {
 			environment.define(self.declaration.params[i].lexeme.clone(), arguments[i].clone());
 		}
 
 		let statements = self.declaration.body.clone();
-
-		println!("Calling function");
 
 
 		interpreter.execute_external_block(statements, environment)?;

@@ -6,6 +6,8 @@ use crate::{interpreter::values::Value, scanner::token::Token};
 
 pub mod error;
 
+
+/// A struct representing an interpreter's environment
 #[derive(Default, Clone)]
 pub struct Environment {
 	pub values: HashMap<String, Value>,
