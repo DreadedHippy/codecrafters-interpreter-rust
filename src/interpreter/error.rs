@@ -5,6 +5,7 @@ use super::values::Value;
 pub enum ValueError {
 	Break,
 	Continue,
+	Return(Value),
 	Std {token: Token, message: String},
 }
 
@@ -18,6 +19,7 @@ impl ValueError {
 			Self::Std { token, message } => eprintln!("{}\n[line {}]", message, token.line),
 			Self::Break => eprintln!("'BREAK' value error detected"),
 			Self::Continue => eprintln!("'CONTINUE' value error detected"),
+			Self::Return(v) => eprintln!("'RETURN' value error detected, value {}", v),
 		}
 	}
 }

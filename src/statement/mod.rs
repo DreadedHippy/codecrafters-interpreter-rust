@@ -15,6 +15,7 @@ pub enum Statement {
 	Print(PrintStatement),
 	Expression(ExprStatement),
 	Function(FunctionStatement),
+	Return(ReturnStatement),
 	If(IfStatement),
 	While(WhileStatement),
 	Break(),
@@ -36,6 +37,9 @@ pub struct ExprStatement(Expr);
 
 #[derive(Clone)]
 pub struct FunctionStatement{pub name: Token, pub params: Vec<Token>, pub body: Vec<Statement>}
+
+#[derive(Clone)]
+pub struct ReturnStatement{keyword: Token, value: Option<Expr>}
 #[derive(Clone)]
 pub struct IfStatement{condition: Expr, then_branch: Box<Statement>, else_branch: Option<Box<Statement>>}
 #[derive(Clone)]
@@ -70,6 +74,7 @@ impl Interpreter {
 			Statement::Break() => {self.interpret_break_statement()},
 			Statement::Continue() => {self.interpret_continue_statement()},
 			Statement::Function(f) => {self.interpret_function_statement(f)},
+			Statement::Return(r) => {self.interpret_return_statement(r)},
 		}
 	}
 
@@ -100,7 +105,7 @@ impl Interpreter {
 	}
 
 	pub fn interpret_block_statement(&mut self, s: BlockStatement) -> ValueResult<()> {
-		self.environment.nest_self();
+		self.environment = Environment::with_enclosing(self.environment.clone());
 
 		let statements = s.statements;
 
@@ -108,8 +113,11 @@ impl Interpreter {
 			self.interpret_statement(s)?;
 		}
 
-		self.environment.set_as_parent();
-
+		if let Some(enclosing) = self.environment.enclosing.clone() {
+			self.environment = *enclosing
+		} else {
+			panic!("Found no enclosing environment immediately after creating one, this shouldn't happen");
+		}
 
 		Ok(())
 	}
@@ -130,6 +138,17 @@ impl Interpreter {
 		self.environment = p; // Go back to old environment
 
 
+		Ok(())
+
+	}
+
+	pub fn execute_statements(&mut self, statements: Vec<Statement>) -> ValueResult<()> {
+
+		for s in statements {
+			self.interpret_statement(s)?;
+		}
+		
+		
 		Ok(())
 
 	}
@@ -172,11 +191,25 @@ impl Interpreter {
 
 	pub fn interpret_function_statement(&mut self, s: FunctionStatement) -> ValueResult<()> {
 		let function_name = s.name.lexeme.clone();
-		let function = LoxFunction::new(s);
+		// println!("{:?}", self.environment.values.iter().map(|(k, v)| format!("{}: {}", k, v.to_string())).collect::<String>());
+		let function = LoxFunction::new(s.clone());
+		
+		self.globals.define(function_name.clone(), Value::Function(function.clone()));
+		self.environment.define(function_name.clone(), Value::Function(function.clone()));
 
-		self.environment.define(function_name, Value::Function(function));
 
 		Ok(())
+	}
+
+	pub fn interpret_return_statement(&mut self, s: ReturnStatement) -> ValueResult<()> {
+		let mut value = Value::Nil;
+		let _ = s.keyword; // Just so we read the field, and prevent compiler warning
+
+		if let Some(v) = s.value {
+			value = self.interpret_expr(v)?;
+		}
+
+		Err(ValueError::Return(value))
 	}
 }
 
@@ -274,6 +307,10 @@ impl Parser {
 			return self.print_statement()
 		}
 
+		if self.match_next(vec![TokenType::RETURN]) {
+			return self.return_statement()
+		}
+
 		if self.match_next(vec![TokenType::IF]) {
 			return self.if_statement()
 		}
@@ -312,6 +349,19 @@ impl Parser {
 
 		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
 		Ok(Statement::Print(value.into()))
+	}
+
+	fn return_statement(&mut self) -> StatementResult<Statement> {
+		let keyword = self.previous();
+		let mut value = None;
+
+		if !self.check(TokenType::SEMICOLON) {
+			value = Some(self.expression()?);
+		}
+
+		self.consume(TokenType::SEMICOLON, "Expect ';' after a return value.".to_string())?;
+
+		return Ok(Statement::Return(ReturnStatement { keyword, value }));
 	}
 
 	fn block_statement(&mut self) -> StatementResult<Statement> {

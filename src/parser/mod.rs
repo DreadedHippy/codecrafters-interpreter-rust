@@ -105,19 +105,23 @@ impl Parser {
 	}
 
 
+	/// Checks if the current token's type matches the given token's type
 	pub fn check(&self, token_type: TokenType) -> bool {
 		if self.is_at_end() {return false}
 		return self.peek().token_type == token_type
 	}
 
+	/// Checks if the end of the file has been reached;
 	pub fn is_at_end(&self) -> bool {
 		self.peek().token_type == TokenType::EOF
 	}
 
+	/// Gets the current token;
 	pub fn peek(&self) -> Token {
 		return self.tokens.get(self.current).unwrap().clone()
 	}
 
+	/// Gets the previous token
 	pub fn previous(&self) -> Token {
 		return self.tokens.get(self.current - 1).unwrap().clone()
 	}

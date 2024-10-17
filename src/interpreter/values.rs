@@ -1,6 +1,8 @@
-use crate::statement::FunctionStatement;
+// use std::collections::HashMap;
 
-use super::{error::ValueResult, Interpreter};
+use crate::statement::{environment::Environment, FunctionStatement};
+
+use super::{error::{ValueError, ValueResult}, Interpreter};
 
 #[derive(PartialEq, Clone)]
 pub enum Value {
@@ -53,7 +55,8 @@ impl Callable for Native {
 
 #[derive(Clone)]
 pub struct LoxFunction {
-	declaration: FunctionStatement
+	declaration: FunctionStatement,
+	// pub closure: Environment,
 }
 
 impl PartialEq for LoxFunction {
@@ -83,18 +86,39 @@ impl Callable for LoxFunction {
 		format!("<fn {}>",self.declaration.name.lexeme)
 	}
 
+
+	/// Call procedure for a LoxFunction
 	fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> ValueResult<Value> {
-		let mut environment = interpreter.globals.create_cloned_inner();
+		let mut environment = Environment::with_enclosing(interpreter.globals.clone());
 
-		for i in 0..self.declaration.params.len() {
-			environment.define(self.declaration.params[i].lexeme.clone(), arguments[i].clone());
-		}
+		self.declaration.params.iter().zip(arguments.iter())
+			.map(|(param, arg)| {
+				(param.lexeme.clone(), arg.clone())
+			})
+			.for_each(|(k, v)| {
+				environment.define(k, v);
+			})
+		;
 
-		let statements = self.declaration.body.clone();
+		let previous = interpreter.environment.clone();
+		interpreter.environment = environment;
 
+		let result = match interpreter.execute_statements(self.declaration.body.clone()) {
+				Err(value) => {
+					match value {
+						ValueError::Return(v) => Ok(v),
+						k => {
+							// Ideally this should never happen but just in case it somehow does
+							k.error();
+							Err(ValueError::new(self.declaration.name.clone(), "Non-return value error detected in function call", ))
+						}
+					}
+				},
+				_ => Ok(Value::Nil)
+		};
 
-		interpreter.execute_external_block(statements, environment)?;
-		return Ok(Value::Nil);
+		interpreter.environment = previous;
+		result
 	}
 }
 
