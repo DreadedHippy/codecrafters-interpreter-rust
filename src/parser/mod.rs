@@ -1,4 +1,4 @@
-use expr::{Expr, ExprLiteral, ExprLogical};
+use expr::{Expr, ExprCall, ExprLiteral, ExprLogical};
 use error::{ParserError, ParserResult};
 
 use crate::scanner::token::{Literal, Token, TokenType};
@@ -182,7 +182,44 @@ impl Parser {
 		}
 
 
-		return self.primary()
+		return self.call()
+		// return self.primary()
+	}
+	
+	pub fn call(&mut self) -> ParserResult<Expr> {
+		let mut expr = self.primary()?;
+
+		loop {
+			if self.match_next(vec![TokenType::LEFT_PAREN]) {
+				expr = self.finish_call(expr)?;
+			} else {
+				break
+			}
+		}
+
+		return Ok(expr)
+	}
+
+	pub fn finish_call(&mut self, callee: Expr) -> ParserResult<Expr> {
+		let mut arguments = Vec::new();
+
+		if !self.check(TokenType::RIGHT_PAREN) {
+			loop {
+				if arguments.len() >= 255 {
+					self.error(self.peek(), "Can't have more than 255 arguments".to_string());
+				}
+				arguments.push(self.expression()?);
+				if !self.match_next(vec![TokenType::COMMA]) {
+					break
+				}
+			}
+		}
+
+		let paren = self.consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments".to_string())?;
+
+		Ok(Expr::Call(ExprCall {callee: Box::new(callee), arguments, paren}))
+
+
 	}
 
 	pub fn primary(&mut self) -> ParserResult<Expr> {

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::OnceLock};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Token {
 	pub token_type: TokenType,
 	pub lexeme: String,
@@ -79,7 +79,7 @@ impl std::fmt::Display for TokenType {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
 	Null,
 	Integer(i64),

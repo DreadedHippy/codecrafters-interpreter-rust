@@ -1,20 +1,41 @@
-use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
-use values::Value;
+use std::time::UNIX_EPOCH;
 
-use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
+use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
+use values::{Callable, Native, Value};
+
+use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
 
 pub mod values;
 pub mod error;
 
 pub struct Interpreter {
-	pub environment: Environment
+	pub environment: Environment,
+	pub globals: Environment,
 }
 
 impl Interpreter {
 	pub fn new() -> Self {
-		Self {environment: Environment::default()}
+		let mut new = Self {environment: Environment::default(), globals: Environment::default()};
+		
+		fn get_curr_time() -> Value {
+			let v = std::time::SystemTime::now()
+			.duration_since(UNIX_EPOCH)
+			.expect("Time went backwards")
+			.as_millis();
+
+			return Value::Double(v as f64);
+		}
+	
+		let clock = Native::new(0, get_curr_time);
+		
+		new.globals.define("clock".to_string(), Value::NativeFn(clock));
+		new.environment = new.globals.clone();
+		
+		new
+
 	}
 }
+
 impl Interpreter {
 	pub fn interpret(&mut self, expr: Expr) -> Option<Value>{
 		let res = self.interpret_expr(expr);
@@ -31,6 +52,7 @@ impl Interpreter {
 			Expr::Binary(x) => {self.interpret_expr_binary(x)},
 			Expr::Literal(x) => {self.interpret_expr_literal(x)},
 			Expr::Unary(x) => {self.interpret_expr_unary(x)},
+			Expr::Call(c) => {self.interpret_expr_call(c)},
 			Expr::Grouping(x) => {self.interpret_expr_grouping(x)},
 			Expr::Logical(x) => {self.interpret_expr_logical(x)},
 			Expr::Variable(x) => {Ok(self.environment.get(x.name)?)},
@@ -114,7 +136,6 @@ impl Interpreter {
 	}
 }
 
-
 impl Interpreter {
 	pub fn interpret_expr_unary(&mut self, expr: ExprUnary) -> ValueResult<Value> {
 		let right = self.interpret_expr(*expr.right)?;
@@ -130,6 +151,29 @@ impl Interpreter {
 		};
 
 		Ok(v)
+	}
+}
+
+impl Interpreter {
+	pub fn interpret_expr_call(&mut self, expr: ExprCall) -> ValueResult<Value> {
+		let callee = self.interpret_expr(*expr.callee)?;
+		let mut arguments = Vec::new();
+
+		for argument in expr.arguments {
+			arguments.push(self.interpret_expr(argument)?);
+		}
+
+		let function: Box<dyn Callable> = match callee {
+			Value::NativeFn(x) => Box::new(x),
+			Value::Function(f) => Box::new(f),
+			_ => return Err(ValueError::Std { token: expr.paren, message: "Can only call functions and classes".to_string() })
+		};
+
+		if arguments.len() != function.arity() {
+			return Err(ValueError::Std { token: expr.paren, message: format!("Expected {} arguments but got {}.", function.arity(), arguments.len()) })
+		}
+
+		return Ok(function.call(self, arguments)?)
 	}
 }
 

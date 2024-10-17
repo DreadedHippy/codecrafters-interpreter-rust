@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell:: RefCell, collections::HashMap, rc::Rc};
 
 use error::{EnvironmentError, EnvironmentResult};
 
@@ -6,37 +6,50 @@ use crate::{interpreter::values::Value, scanner::token::Token};
 
 pub mod error;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Environment {
-	values: HashMap<String, Value>,
+	pub values: HashMap<String, Value>,
 	enclosing: Option<Rc<RefCell<Environment>>>
 }
 
-impl Environment {
 
-	pub fn create_inner(&mut self) -> Self {
+impl Environment {
+	/// Takes a given environment, mutates it changing it into its own child
+	pub fn nest_self(&mut self) {
 		let mut d = Environment::default();
 		std::mem::swap(&mut d, self);
 		
-		Environment {
+		*self = Environment {
 			values: HashMap::new(),
 			enclosing: Some(Rc::new(RefCell::new(d)))
+		};
+	}
+
+	/// Clones a given environment, nesting it as a parent of a new environment, and returns the nested environment
+	pub fn create_cloned_inner(&mut self) -> Self {
+		let c = self.clone();
+		Environment {
+			values: HashMap::new(),
+			enclosing: Some(Rc::new(RefCell::new(c)))
 		}
 	}
 
-	pub fn get_enclosing(&mut self) -> Self{
+	/// Mutates a given environment, setting it to it's own parent, discarding the child
+	pub fn set_as_parent(&mut self){
 		let mut d = Environment::default();
 		std::mem::swap(&mut d, self);
 
 		d = d.enclosing.unwrap().take();
 
-		d
+		*self = d
 	}
 
+	/// Defines/Overwrites values for a new entry
 	pub fn define(&mut self, name: String, value: Value) {
 		self.values.insert(name, value);
 	}
 
+	/// Get's the value for a given entry
 	pub fn get(&self, name: Token) -> EnvironmentResult<Value> {
 		// Check current scope
 		if let Some(v) = self.values.get(&name.lexeme) {
@@ -52,6 +65,7 @@ impl Environment {
 		Err(EnvironmentError::new(name, &format!("Undefined variable '{}'.", l)))
 	}
 
+	/// Overwrites value for a given entry. Panics if entry is not found
 	pub fn assign(&mut self, name: Token, value: Value) -> EnvironmentResult<()> {
 		if let Some(v) = self.values.get_mut(&name.lexeme) {
 			*v = value;

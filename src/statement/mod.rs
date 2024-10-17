@@ -1,6 +1,7 @@
+use environment::Environment;
 use error::{StatementError, StatementResult};
 
-use crate::{interpreter::{error::{ValueError, ValueResult}, values::Value, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
+use crate::{interpreter::{error::{ValueError, ValueResult}, values::{LoxFunction, Value}, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
 
 pub mod error;
 pub mod environment;
@@ -13,6 +14,7 @@ pub mod environment;
 pub enum Statement {
 	Print(PrintStatement),
 	Expression(ExprStatement),
+	Function(FunctionStatement),
 	If(IfStatement),
 	While(WhileStatement),
 	Break(),
@@ -32,6 +34,8 @@ pub struct PrintStatement(Expr);
 #[derive(Clone)]
 pub struct ExprStatement(Expr);
 
+#[derive(Clone)]
+pub struct FunctionStatement{pub name: Token, pub params: Vec<Token>, pub body: Vec<Statement>}
 #[derive(Clone)]
 pub struct IfStatement{condition: Expr, then_branch: Box<Statement>, else_branch: Option<Box<Statement>>}
 #[derive(Clone)]
@@ -65,6 +69,7 @@ impl Interpreter {
 			Statement::While(w) => {self.interpret_while_statement(w)},
 			Statement::Break() => {self.interpret_break_statement()},
 			Statement::Continue() => {self.interpret_continue_statement()},
+			Statement::Function(f) => {self.interpret_function_statement(f)},
 		}
 	}
 
@@ -95,7 +100,7 @@ impl Interpreter {
 	}
 
 	pub fn interpret_block_statement(&mut self, s: BlockStatement) -> ValueResult<()> {
-		self.environment = self.environment.create_inner();
+		self.environment.nest_self();
 
 		let statements = s.statements;
 
@@ -103,10 +108,30 @@ impl Interpreter {
 			self.interpret_statement(s)?;
 		}
 
-		self.environment = self.environment.get_enclosing();
+		self.environment.set_as_parent();
 
 
 		Ok(())
+	}
+
+	/// Executes a block of code, using an external scope child environment e.g. the global scope child environment\n
+	/// *WARN*: THE STATE OF THE GIVEN INTERPRETER'S ENVIRONMENT WILL REMAIN UNCHANGED;
+	pub fn execute_external_block(&mut self, statements: Vec<Statement>, environment: Environment) -> ValueResult<()> {
+
+		let p = self.environment.clone();
+
+		self.environment = environment;
+		
+		for s in statements {
+			self.interpret_statement(s)?;
+		}
+		
+		
+		self.environment = p; // Go back to old environment
+
+
+		Ok(())
+
 	}
 
 	pub fn interpret_if_statement(&mut self, s: IfStatement) -> ValueResult<()> {
@@ -144,6 +169,17 @@ impl Interpreter {
 	pub fn interpret_continue_statement(&mut self) -> ValueResult<()> {
 		Err(ValueError::Continue)
 	}
+
+	pub fn interpret_function_statement(&mut self, s: FunctionStatement) -> ValueResult<()> {
+		let function_name = s.name.lexeme.clone();
+		let function = LoxFunction::new(s);
+
+		self.environment.define(function_name, Value::Function(function));
+
+		println!("Function defined");
+
+		Ok(())
+	}
 }
 
 impl From<Expr> for PrintStatement {
@@ -174,10 +210,50 @@ impl Parser {
 	}
 
 	fn declaration(&mut self) -> StatementResult<Statement>{
+		if self.match_next(vec![TokenType::FUN]) {
+			return self.function("function".to_string())
+		}
+
 		if self.match_next(vec![TokenType::VAR]) {
 			return self.var_declaration()
 		}
+
 		return self.statement()
+	}
+
+	fn function(&mut self, kind: String) -> StatementResult<Statement>{
+		let name = self.consume(TokenType::IDENTIFIER, format!("Expect {} name.", kind))?;
+
+		self.consume(TokenType::LEFT_PAREN, format!("Expect '(' after {} name.", kind))?;
+		let mut parameters = Vec::new();
+
+		if !self.check(TokenType::RIGHT_PAREN) {
+			loop {
+				if parameters.len() >= 255 {
+					self.error(self.peek(), "Cant have more than 255 parameters".to_string());
+				}
+
+				parameters.push(self.consume(TokenType::IDENTIFIER, "Expect parameter name".to_string())?);
+
+				if !self.match_next(vec![TokenType::COMMA]) {
+					break
+				}
+			}
+		}
+
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters".to_string())?;
+
+		self.consume(TokenType::LEFT_BRACE, format!("Expect '{{' before {} body", kind))?;
+
+		let body = self.block_statement()?;
+
+		let body = match body {
+			Statement::Block(s) => s.statements,
+			_ => return Err(StatementError::new(self.previous(), "Body not found inside after function, and '{', this ideally shouldn't happen"))
+		};
+
+		return Ok(Statement::Function(FunctionStatement {name, params: parameters, body}))
+
 	}
 
 	fn var_declaration(&mut self) -> StatementResult<Statement> {

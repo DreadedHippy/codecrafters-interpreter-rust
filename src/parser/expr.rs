@@ -4,6 +4,7 @@ use crate::scanner::token::Token;
 pub enum Expr {
 	Literal(ExprLiteral),
 	Unary(ExprUnary),
+	Call(ExprCall),
 	Binary(ExprBinary),
 	Grouping(ExprGrouping),
 	Variable(ExprVariable),
@@ -16,6 +17,7 @@ impl ExprAccept for Expr {
 		match self {
 			Expr::Literal(x) => x.accept(),
 			Expr::Unary(u) => u.accept(),
+			Expr::Call(c) => c.accept(),
 			Expr::Binary(b) => b.accept(),
 			Expr::Grouping(g) => g.accept(),
 			Expr::Variable(v) => v.accept(),
@@ -101,6 +103,14 @@ pub struct ExprUnary {
 }
 
 #[derive(Clone)]
+pub struct ExprCall {
+	pub callee: Box<Expr>,
+	pub paren: Token,
+	pub arguments: Vec<Expr>
+}
+
+
+#[derive(Clone)]
 pub struct ExprBinary {
 	pub left: Box<Expr>,
 	pub operator: Token,
@@ -144,6 +154,12 @@ impl ExprAccept for ExprBinary {
 impl ExprAccept for ExprUnary {
 	fn accept(self) -> String {
 		Expr::parenthesize(self.operator.lexeme, vec![*self.right])
+	}
+}
+
+impl ExprAccept for ExprCall {
+	fn accept(self) -> String {
+		self.paren.lexeme
 	}
 }
 
