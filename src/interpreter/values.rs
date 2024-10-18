@@ -1,6 +1,6 @@
 // use std::collections::HashMap;
 
-use crate::statement::{environment::Environment, FunctionStatement};
+use crate::statement::{environment::{EnvCell, Environment}, FunctionStatement};
 
 use super::{error::{ValueError, ValueResult}, Interpreter};
 
@@ -56,7 +56,7 @@ impl Callable for Native {
 #[derive(Clone)]
 pub struct LoxFunction {
 	declaration: FunctionStatement,
-	// pub closure: Environment,
+	pub closure: EnvCell,
 }
 
 impl PartialEq for LoxFunction {
@@ -72,8 +72,8 @@ impl PartialEq for LoxFunction {
 }
 
 impl LoxFunction {
-	pub fn new(declaration: FunctionStatement) -> Self {
-		Self {declaration}
+	pub fn new(declaration: FunctionStatement, closure: EnvCell) -> Self {
+		Self {declaration, closure}
 	}
 }
 
@@ -89,7 +89,7 @@ impl Callable for LoxFunction {
 
 	/// Call procedure for a LoxFunction
 	fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> ValueResult<Value> {
-		let mut environment = Environment::with_enclosing(interpreter.globals.clone());
+		let mut environment = EnvCell::with_enclosing(&self.closure);
 
 		self.declaration.params.iter().zip(arguments.iter())
 			.map(|(param, arg)| {

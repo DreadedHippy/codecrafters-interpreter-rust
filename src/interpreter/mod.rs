@@ -3,19 +3,19 @@ use std::time::UNIX_EPOCH;
 use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
 use values::{Callable, Native, Value};
 
-use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::Environment};
+use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::EnvCell};
 
 pub mod values;
 pub mod error;
 
 pub struct Interpreter {
-	pub environment: Environment,
-	pub globals: Environment,
+	pub environment: EnvCell,
+	pub globals: EnvCell,
 }
 
 impl Interpreter {
 	pub fn new() -> Self {
-		let mut new = Self {environment: Environment::default(), globals: Environment::default()};
+		let mut new = Self {environment: EnvCell::new(), globals: EnvCell::new()};
 		
 		fn get_curr_time() -> Value {
 			let v = std::time::SystemTime::now()

@@ -1,4 +1,4 @@
-use environment::Environment;
+use environment::EnvCell;
 use error::{StatementError, StatementResult};
 
 use crate::{interpreter::{error::{ValueError, ValueResult}, values::{LoxFunction, Value}, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
@@ -105,7 +105,8 @@ impl Interpreter {
 	}
 
 	pub fn interpret_block_statement(&mut self, s: BlockStatement) -> ValueResult<()> {
-		self.environment = Environment::with_enclosing(self.environment.clone());
+		let previous = self.environment.clone();
+		self.environment = EnvCell::with_enclosing(&self.environment);
 
 		let statements = s.statements;
 
@@ -113,34 +114,36 @@ impl Interpreter {
 			self.interpret_statement(s)?;
 		}
 
-		if let Some(enclosing) = self.environment.enclosing.clone() {
-			self.environment = *enclosing
-		} else {
-			panic!("Found no enclosing environment immediately after creating one, this shouldn't happen");
-		}
+		self.environment = previous;
+
+		// if let Some(enclosing) = self.environment.enclosing.clone() {
+		// 	self.environment = *enclosing
+		// } else {
+		// 	panic!("Found no enclosing environment immediately after creating one, this shouldn't happen");
+		// }
 
 		Ok(())
 	}
 
 	/// Executes a block of code, using an external scope child environment e.g. the global scope child environment\n
 	/// *WARN*: THE STATE OF THE GIVEN INTERPRETER'S ENVIRONMENT WILL REMAIN UNCHANGED;
-	pub fn execute_external_block(&mut self, statements: Vec<Statement>, environment: Environment) -> ValueResult<()> {
+	// pub fn execute_external_block(&mut self, statements: Vec<Statement>, environment: Environment) -> ValueResult<()> {
 
-		let p = self.environment.clone();
+	// 	let previous = self.environment.clone();
 
-		self.environment = environment;
+	// 	self.environment = environment;
 		
-		for s in statements {
-			self.interpret_statement(s)?;
-		}
+	// 	for s in statements {
+	// 		self.interpret_statement(s)?;
+	// 	}
 		
 		
-		self.environment = p; // Go back to old environment
+	// 	self.environment = p; // Go back to old environment
 
 
-		Ok(())
+	// 	Ok(())
 
-	}
+	// }
 
 	pub fn execute_statements(&mut self, statements: Vec<Statement>) -> ValueResult<()> {
 
@@ -191,10 +194,7 @@ impl Interpreter {
 
 	pub fn interpret_function_statement(&mut self, s: FunctionStatement) -> ValueResult<()> {
 		let function_name = s.name.lexeme.clone();
-		// println!("{:?}", self.environment.values.iter().map(|(k, v)| format!("{}: {}", k, v.to_string())).collect::<String>());
-		let function = LoxFunction::new(s.clone());
-		
-		self.globals.define(function_name.clone(), Value::Function(function.clone()));
+		let function = LoxFunction::new(s.clone(), self.environment.clone());
 		self.environment.define(function_name.clone(), Value::Function(function.clone()));
 
 

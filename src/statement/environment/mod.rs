@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use error::{EnvironmentError, EnvironmentResult};
 
@@ -11,16 +11,50 @@ pub mod error;
 #[derive(Default, Clone)]
 pub struct Environment {
 	pub values: HashMap<String, Value>,
-	pub enclosing: Option<Box<Environment>>
+	pub enclosing: Option<EnvCell>
+}
+
+/// A struct holding references to environments, this is to allow for self-references
+#[derive(Clone)]
+pub struct EnvCell(Rc<RefCell<Environment>>);
+
+impl EnvCell {
+	pub fn new() -> Self {
+		let e = Environment::default();
+		Self(Rc::new(RefCell::new(e)))
+	}
+
+	pub fn define(&mut self, name: String, value: Value) {
+		self.0.borrow_mut().define(name, value);
+	}
+
+	pub fn assign(&mut self, name: Token, value: Value) -> EnvironmentResult<()> {
+		self.0.borrow_mut().assign(name, value)
+	}
+
+	pub fn get(&self, name: Token) -> EnvironmentResult<Value> {
+		return self.0.borrow().get(name)
+	}
+
+	pub fn with_enclosing(enclosing: &EnvCell) -> Self {
+		let enclosing_environment = enclosing.clone();
+
+		let new_environment = Environment::with_enclosing(enclosing_environment);
+
+		let new_env_cell = EnvCell(Rc::new(RefCell::new(new_environment)));
+
+		return new_env_cell;
+
+	}
 }
 
 
 impl Environment {
 	/// Takes a given environment, mutates it changing it into its own child
-	pub fn with_enclosing(enclosing: Self) -> Self {
+	pub fn with_enclosing(enclosing: EnvCell) -> Self {
 		Self {
 			values: HashMap::new(),
-			enclosing: Some(Box::new(enclosing))
+			enclosing: Some(enclosing)
 		}
 	}
 
@@ -64,8 +98,8 @@ impl Environment {
 		}
 		
 		// Check enclosing scope
-		if let Some(s) = &self.enclosing {
-			return s.get(name)
+		if let Some(EnvCell(s)) = &self.enclosing {
+			return s.borrow().get(name)
 		}
 		
 		let l = name.lexeme.clone();
@@ -79,8 +113,8 @@ impl Environment {
 			return Ok(())
 		}
 
-		if let Some(s) = &mut self.enclosing {
-			return s.assign(name, value)
+		if let Some(EnvCell(s)) = &mut self.enclosing {
+			return s.borrow_mut().assign(name, value)
 		}
 
 		let l = name.lexeme.clone();
