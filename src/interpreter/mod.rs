@@ -17,7 +17,8 @@ pub struct Interpreter {
 impl Interpreter {
 	/// Initialize a new interpreter
 	pub fn new() -> Self {
-		let mut new = Self {environment: EnvCell::new(), globals: EnvCell::new()};
+		let globals = EnvCell::new();
+		let mut new = Self {environment: EnvCell::with_enclosing(&globals), globals};
 		
 		fn get_curr_time() -> Value {
 			let v = std::time::SystemTime::now()
