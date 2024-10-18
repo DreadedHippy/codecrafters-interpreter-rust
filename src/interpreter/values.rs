@@ -1,24 +1,37 @@
 // use std::collections::HashMap;
 
-use crate::statement::{environment::{EnvCell, Environment}, FunctionStatement};
+use crate::statement::{environment::EnvCell, FunctionStatement};
 
 use super::{error::{ValueError, ValueResult}, Interpreter};
 
+/// An enum representing all possible Lox values
 #[derive(PartialEq, Clone)]
 pub enum Value {
+	/// Lox Number
 	Double(f64),
+	/// Lox Null/nil
 	Nil,
+	/// Lox Boolean
 	Boolean(bool),
+	/// Lox String
 	String(String),
+	/// Lox Native Function/ In-built functions
 	NativeFn(Native),
+	/// Lox user-defined functions
 	Function(LoxFunction)
 }
 
+/// A trait to be implemented for any call-able Lox value
 pub trait Callable {
+	/// This defines the result of a Lox Value call
 	fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> ValueResult<Value>;
+	/// This defines the number of arguments, taken by a Lox Callable
 	fn arity(&self) -> usize;
+	/// This defines the printed result of a Lox Callable Value
 	fn to_string(&self) -> String;
 }
+
+/// A struct representing Lox Native/ In-built functions
 
 #[derive(PartialEq, Clone)]
 pub struct Native {
@@ -28,7 +41,7 @@ pub struct Native {
 }
 
 impl Native {
-	
+	/// Create a new Native function
 	pub fn new(arity: usize, fn_call: fn() -> Value) -> Self{
 		Self {
 			arity,
@@ -39,7 +52,6 @@ impl Native {
 }
 
 impl Callable for Native {
-
 	fn call(&self, _: &mut Interpreter, _: Vec<Value>) -> ValueResult<Value> {
 		Ok((self.fn_call)())
 	}
@@ -53,9 +65,12 @@ impl Callable for Native {
 	}
 }
 
+/// A struct representing Lox user-defined functions
 #[derive(Clone)]
 pub struct LoxFunction {
+	/// The associated function statement
 	declaration: FunctionStatement,
+	/// The closure/environment of the function
 	pub closure: EnvCell,
 }
 
@@ -72,6 +87,7 @@ impl PartialEq for LoxFunction {
 }
 
 impl LoxFunction {
+	/// Initialize a user-defined function
 	pub fn new(declaration: FunctionStatement, closure: EnvCell) -> Self {
 		Self {declaration, closure}
 	}
@@ -87,7 +103,6 @@ impl Callable for LoxFunction {
 	}
 
 
-	/// Call procedure for a LoxFunction
 	fn call(&self, interpreter: &mut Interpreter, arguments: Vec<Value>) -> ValueResult<Value> {
 		let mut environment = EnvCell::with_enclosing(&self.closure);
 
@@ -123,6 +138,7 @@ impl Callable for LoxFunction {
 }
 
 impl Value {
+	/// Only the Lox boolean [`Value`] false and the Lox null/nill are falsy, every other is truthy
 	pub fn is_truthy(&self) -> bool {
 		match self {
 			Value::Boolean(false) | Value::Nil => false,

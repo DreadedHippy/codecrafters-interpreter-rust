@@ -6,6 +6,7 @@ use crate::scanner::token::{Literal, Token, TokenType};
 pub mod expr;
 pub mod error;
 
+/// A struct representing the parser, moving token by token
 pub struct Parser {
 	pub tokens: Vec<Token>,
 	current: usize,
@@ -14,20 +15,24 @@ pub struct Parser {
 }
 
 impl Parser {
+	/// Initialize a new parser
 	pub fn new(tokens: Vec<Token>) -> Self {
 		Parser {tokens, current: 0, had_error: false, loop_depth: 0}
 	}
 }
 
 impl Parser {
+	/// Begin parsing
 	pub fn parse(&mut self) -> Option<Expr> {
 		self.expression().ok()
 	}
 
+	/// Parse an expression
 	pub fn expression(&mut self) -> ParserResult<Expr> {
 		return self.assignment()
 	}
 
+	/// Parse an assignment
 	pub fn assignment(&mut self) -> ParserResult<Expr> {
 		let expr = self.or()?;
 
@@ -47,6 +52,7 @@ impl Parser {
 		Ok(expr)
 	}
 
+	/// Parse a logical or
 	pub fn or(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.and()?;
 
@@ -60,6 +66,7 @@ impl Parser {
 		Ok(expr)
 	}
 
+	/// Parse a Logical and
 	pub fn and(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.equality()?;
 
@@ -73,6 +80,7 @@ impl Parser {
 		Ok(expr)
 	}
 
+	/// Parse equality
 	pub fn equality(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.comparison()?;
 
@@ -86,6 +94,8 @@ impl Parser {
 		return Ok(expr);
 	}
 
+	/// Check if the current token matches at least one in a given token. If true, it advances "current"
+	/// and returns true, returns false otherwise
 	pub fn match_next(&mut self, token_types: Vec<TokenType>) -> bool {
 		for token_type in token_types {
 			if self.check(token_type) {
@@ -97,6 +107,7 @@ impl Parser {
 		return false
 	}
 
+	/// Moves "current" one step forward if not at end of file
 	pub fn advance(&mut self) -> Token {
 		if !self.is_at_end() {
 			self.current += 1;
@@ -127,7 +138,7 @@ impl Parser {
 	}
 
 
-	// Comparison
+	/// Parse comparison
 	pub fn comparison(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.term()?;
 
@@ -141,6 +152,7 @@ impl Parser {
 		Ok(expr)
 	}
 
+	/// Parse a term
 	pub fn term(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.factor()?;
 
@@ -165,6 +177,7 @@ impl Parser {
 		Ok(expr)
 	}
 
+	/// Parse a factor
 	pub fn factor(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.unary()?;
 
@@ -187,9 +200,9 @@ impl Parser {
 
 
 		return self.call()
-		// return self.primary()
 	}
 	
+	/// Begin parsing a call
 	pub fn call(&mut self) -> ParserResult<Expr> {
 		let mut expr = self.primary()?;
 
@@ -204,6 +217,7 @@ impl Parser {
 		return Ok(expr)
 	}
 
+	/// Finish parsing a call
 	pub fn finish_call(&mut self, callee: Expr) -> ParserResult<Expr> {
 		let mut arguments = Vec::new();
 
@@ -226,6 +240,7 @@ impl Parser {
 
 	}
 
+	/// Parse a primary expression
 	pub fn primary(&mut self) -> ParserResult<Expr> {
 		if self.match_next(vec![TokenType::FALSE]) {return Ok(Expr::Literal(ExprLiteral::False))}
 		if self.match_next(vec![TokenType::TRUE]) {return Ok(Expr::Literal(ExprLiteral::True))}
@@ -261,6 +276,7 @@ impl Parser {
 
 	}
 
+	/// Expect a given token to be at the current position, throws an error otherwise
 	pub fn consume(&mut self, token_type: TokenType, message: String) -> ParserResult<Token> {
 		if self.check(token_type) {
 			return Ok(self.advance())
@@ -269,6 +285,7 @@ impl Parser {
 		return Err(self.error(self.peek(), message))
 	}
 
+	/// Generate a ParseeError
 	pub fn error(&mut self, token: Token, message: String) -> ParserError {
 		self.had_error = true;
 		let error = ParserError::new(token, message);
@@ -276,6 +293,7 @@ impl Parser {
 		error
 	}
 
+	/// Synchronize the curr in the event of bad syntax
 	pub fn synchronize(&mut self) {
 		self.advance();
 

@@ -5,11 +5,6 @@ use crate::{interpreter::{error::{ValueError, ValueResult}, values::{LoxFunction
 
 pub mod error;
 pub mod environment;
-
-// pub enum Declaration {
-// 	VarDecl(VarDeclaration),
-// 	StmtDecl(StatementError)
-// }
 #[derive(Clone)]
 pub enum Statement {
 	Print(PrintStatement),
@@ -50,6 +45,7 @@ pub struct BlockStatement{statements: Vec<Statement>}
 pub struct VarDeclaration{name: Token, initializer: Option<Expr>}
 
 impl Interpreter {
+	/// Interpret a list of statements sequentially. Quits the program upon error
 	pub fn interpret_statements(&mut self, statements: Vec<Statement>) {
 		for s in statements {
 			let v = self.interpret_statement(s);
@@ -63,6 +59,7 @@ impl Interpreter {
 }
 
 impl Interpreter {
+	/// Interpret a given Lox Statement
 	pub fn interpret_statement(&mut self, s: Statement) -> ValueResult<()> {
 		match s {
 			Statement::Expression(e) => {self.interpret_expr_statement(e)},
@@ -78,12 +75,14 @@ impl Interpreter {
 		}
 	}
 
+	/// Interpret an expression statement
 	pub fn interpret_expr_statement(&mut self, s: ExprStatement) -> ValueResult<()> {
 		self.interpret_expr(s.0)?;
 
 		Ok(())
 	}
 
+	/// Interpret a print statement
 	pub fn interpret_print_statement(&mut self, s: PrintStatement) -> ValueResult<()> {
 		let v = self.interpret_expr(s.0)?;
 
@@ -92,6 +91,7 @@ impl Interpreter {
 		Ok(())
 	}
 
+	/// Interpret a var statement
 	pub fn interpret_var_statement(&mut self, s: VarDeclaration) -> ValueResult<()> {
 		let mut value = Value::Nil;
 
@@ -104,6 +104,7 @@ impl Interpreter {
 		Ok(())
 	}
 
+	/// Interpret a block statement
 	pub fn interpret_block_statement(&mut self, s: BlockStatement) -> ValueResult<()> {
 		let previous = self.environment.clone();
 		self.environment = EnvCell::with_enclosing(&self.environment);
@@ -115,36 +116,10 @@ impl Interpreter {
 		}
 
 		self.environment = previous;
-
-		// if let Some(enclosing) = self.environment.enclosing.clone() {
-		// 	self.environment = *enclosing
-		// } else {
-		// 	panic!("Found no enclosing environment immediately after creating one, this shouldn't happen");
-		// }
-
 		Ok(())
 	}
 
-	/// Executes a block of code, using an external scope child environment e.g. the global scope child environment\n
-	/// *WARN*: THE STATE OF THE GIVEN INTERPRETER'S ENVIRONMENT WILL REMAIN UNCHANGED;
-	// pub fn execute_external_block(&mut self, statements: Vec<Statement>, environment: Environment) -> ValueResult<()> {
-
-	// 	let previous = self.environment.clone();
-
-	// 	self.environment = environment;
-		
-	// 	for s in statements {
-	// 		self.interpret_statement(s)?;
-	// 	}
-		
-		
-	// 	self.environment = p; // Go back to old environment
-
-
-	// 	Ok(())
-
-	// }
-
+	/// Interpret statements sequentially, bubbling up errors to the top
 	pub fn execute_statements(&mut self, statements: Vec<Statement>) -> ValueResult<()> {
 
 		for s in statements {
@@ -156,6 +131,7 @@ impl Interpreter {
 
 	}
 
+	/// Interpret if statement
 	pub fn interpret_if_statement(&mut self, s: IfStatement) -> ValueResult<()> {
 		if self.interpret_expr(s.condition)?.is_truthy() {
 			self.interpret_statement(*s.then_branch)?
@@ -168,6 +144,7 @@ impl Interpreter {
 		Ok(())
 	}
 
+	/// Interpret a while statement
 	pub fn interpret_while_statement(&mut self, s: WhileStatement) -> ValueResult<()> {
 		while self.interpret_expr(s.condition.clone())?.is_truthy() {
 			let v = self.interpret_statement(*s.body.clone());
@@ -184,14 +161,17 @@ impl Interpreter {
 		Ok(())
 	}
 
+	/// Interpret a break statement
 	pub fn interpret_break_statement(&mut self) -> ValueResult<()> {
 		Err(ValueError::Break)
 	}
 
+	/// Interpret a continue statement
 	pub fn interpret_continue_statement(&mut self) -> ValueResult<()> {
 		Err(ValueError::Continue)
 	}
 
+	/// Interpret a function statement
 	pub fn interpret_function_statement(&mut self, s: FunctionStatement) -> ValueResult<()> {
 		let function_name = s.name.lexeme.clone();
 		let function = LoxFunction::new(s.clone(), self.environment.clone());
@@ -201,6 +181,7 @@ impl Interpreter {
 		Ok(())
 	}
 
+	/// Interpret a return statement
 	pub fn interpret_return_statement(&mut self, s: ReturnStatement) -> ValueResult<()> {
 		let mut value = Value::Nil;
 		let _ = s.keyword; // Just so we read the field, and prevent compiler warning
@@ -227,6 +208,7 @@ impl From<Expr> for ExprStatement {
 
 
 impl Parser {
+	/// Parse a statement
 	pub fn parse_statement(&mut self) -> StatementResult<Vec<Statement>> {
 		let mut statements = Vec::new();
 
@@ -240,6 +222,7 @@ impl Parser {
 		Ok(statements)
 	}
 
+	/// Parse a declaration
 	fn declaration(&mut self) -> StatementResult<Statement>{
 		if self.match_next(vec![TokenType::FUN]) {
 			return self.function("function".to_string())
@@ -252,6 +235,7 @@ impl Parser {
 		return self.statement()
 	}
 
+	/// Parse a function
 	fn function(&mut self, kind: String) -> StatementResult<Statement>{
 		let name = self.consume(TokenType::IDENTIFIER, format!("Expect {} name.", kind))?;
 
@@ -287,6 +271,7 @@ impl Parser {
 
 	}
 
+	/// Parse a variable declaration
 	fn var_declaration(&mut self) -> StatementResult<Statement> {
 		let name = self.consume(TokenType::IDENTIFIER, "Expect variable name.".to_string())?;
 		
@@ -302,6 +287,7 @@ impl Parser {
 	}
 
 
+	/// Parse a statement
 	fn statement(&mut self) -> StatementResult<Statement> {
 		if self.match_next(vec![TokenType::PRINT]) {
 			return self.print_statement()
@@ -338,6 +324,7 @@ impl Parser {
 		return self.expression_statement()
 	}
 
+	/// Parse a print statement
 	fn print_statement(&mut self) -> StatementResult<Statement> {
 		let value = self.expression()?;
 
@@ -351,6 +338,7 @@ impl Parser {
 		Ok(Statement::Print(value.into()))
 	}
 
+	/// Parse a return statement
 	fn return_statement(&mut self) -> StatementResult<Statement> {
 		let keyword = self.previous();
 		let mut value = None;
@@ -364,6 +352,7 @@ impl Parser {
 		return Ok(Statement::Return(ReturnStatement { keyword, value }));
 	}
 
+	/// Parse a block statement
 	fn block_statement(&mut self) -> StatementResult<Statement> {
 		let mut statements = Vec::new();
 
@@ -376,12 +365,14 @@ impl Parser {
 		Ok(Statement::Block(BlockStatement{statements}))
 	}
 
+	/// Parse an expression statement
 	fn expression_statement(&mut self) -> StatementResult<Statement> {
 		let value = self.expression()?;
 		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
 		Ok(Statement::Expression(value.into()))
 	}
 
+	/// Parse an if statement
 	fn if_statement(&mut self) -> StatementResult<Statement> {
 		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.".to_string())?;
 
@@ -424,6 +415,7 @@ impl Parser {
 		Ok(Statement::While(WhileStatement {condition, body}))
 	}
 
+	/// Parse a for statement
 	fn for_statement(&mut self) -> StatementResult<Statement> {
 		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.".to_string())?;
 
@@ -486,6 +478,8 @@ impl Parser {
 		return Ok(body);
 	}
 
+
+	/// Parse a break statement
 	fn break_statement(&mut self) -> StatementResult<Statement> {
 		if self.loop_depth == 0 {
 			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'break'."))
@@ -495,6 +489,7 @@ impl Parser {
 		return Ok(Statement::Break())
 	}
 
+	/// Parse a continue statement
 	fn continue_statement(&mut self) -> StatementResult<Statement> {
 		if self.loop_depth == 0 {
 			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'continue'."))
@@ -503,9 +498,5 @@ impl Parser {
 		self.consume(TokenType::SEMICOLON, "Expect ';' after 'continue.".to_string())?;
 		return Ok(Statement::Continue())
 	}
-
-
-
-
 
 }

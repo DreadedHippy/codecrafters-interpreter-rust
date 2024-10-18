@@ -8,12 +8,14 @@ use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGroup
 pub mod values;
 pub mod error;
 
+/// A Lox interpreter
 pub struct Interpreter {
 	pub environment: EnvCell,
 	pub globals: EnvCell,
 }
 
 impl Interpreter {
+	/// Initialize a new interpreter
 	pub fn new() -> Self {
 		let mut new = Self {environment: EnvCell::new(), globals: EnvCell::new()};
 		
@@ -37,6 +39,7 @@ impl Interpreter {
 }
 
 impl Interpreter {
+	/// Begin interpretation
 	pub fn interpret(&mut self, expr: Expr) -> Option<Value>{
 		let res = self.interpret_expr(expr);
 
@@ -46,6 +49,7 @@ impl Interpreter {
 		}
 	}
 
+	/// Interpret an expression
 	pub fn interpret_expr(&mut self, expr: Expr) -> ValueResult<Value> {
 		match expr {
 			Expr::Assignment(x) => {self.interpret_expr_assignment(x)}
@@ -60,8 +64,8 @@ impl Interpreter {
 	}
 }
 
-/// for ExprBinary
 impl Interpreter {
+	/// Interpret a Binary expression
 	pub fn interpret_expr_binary(&mut self, expr: ExprBinary) -> ValueResult<Value> {
 		let left = self.interpret_expr(*expr.left)?;
 		let right = self.interpret_expr(*expr.right)?;
@@ -117,6 +121,7 @@ impl Interpreter {
 
 
 impl Interpreter{
+	/// Interpret a literal expression
 	pub fn interpret_expr_literal(&mut self, expr: ExprLiteral) -> ValueResult<Value> {
 		let v = match expr {
 			ExprLiteral::True => Value::Boolean(true),
@@ -131,12 +136,14 @@ impl Interpreter{
 }
 
 impl Interpreter {
+	/// Interpret a grouping expression
 	pub fn interpret_expr_grouping(&mut self, expr: ExprGrouping) -> ValueResult<Value> {
 		return self.interpret_expr(*expr.0);
 	}
 }
 
 impl Interpreter {
+	/// Interpret a unary expression
 	pub fn interpret_expr_unary(&mut self, expr: ExprUnary) -> ValueResult<Value> {
 		let right = self.interpret_expr(*expr.right)?;
 		let o = expr.operator;
@@ -155,6 +162,7 @@ impl Interpreter {
 }
 
 impl Interpreter {
+	/// Interpret a call expression
 	pub fn interpret_expr_call(&mut self, expr: ExprCall) -> ValueResult<Value> {
 		let callee = self.interpret_expr(*expr.callee)?;
 		let mut arguments = Vec::new();
@@ -178,6 +186,7 @@ impl Interpreter {
 }
 
 impl Interpreter {
+	/// Interpret an assignment expression
 	pub fn interpret_expr_assignment(&mut self, expr: ExprAssignment) -> ValueResult<Value> {
 		let value = self.interpret_expr(*expr.value)?;
 
@@ -187,6 +196,7 @@ impl Interpreter {
 }
 
 impl Interpreter {
+	/// Interpret a Logical expression
 	pub fn interpret_expr_logical(&mut self, expr: ExprLogical) -> ValueResult<Value> {
 		let left = self.interpret_expr(*expr.left)?;
 
@@ -198,8 +208,4 @@ impl Interpreter {
 
 		return self.interpret_expr(*expr.right);
 	}
-}
-
-pub trait Interpret {
-	fn interpret(self) -> ValueResult<Value>;
 }
