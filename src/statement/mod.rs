@@ -26,23 +26,23 @@ impl Statement {
 }
 
 #[derive(Clone)]
-pub struct PrintStatement(Expr);
+pub struct PrintStatement(pub Expr);
 #[derive(Clone)]
-pub struct ExprStatement(Expr);
+pub struct ExprStatement(pub Expr);
 
 #[derive(Clone)]
 pub struct FunctionStatement{pub name: Token, pub params: Vec<Token>, pub body: Vec<Statement>}
 
 #[derive(Clone)]
-pub struct ReturnStatement{keyword: Token, value: Option<Expr>}
+pub struct ReturnStatement{pub keyword: Token, pub value: Option<Expr>}
 #[derive(Clone)]
-pub struct IfStatement{condition: Expr, then_branch: Box<Statement>, else_branch: Option<Box<Statement>>}
+pub struct IfStatement{pub condition: Expr, pub then_branch: Box<Statement>, pub else_branch: Option<Box<Statement>>}
 #[derive(Clone)]
-pub struct WhileStatement{condition: Expr, body: Box<Statement>}
+pub struct WhileStatement{pub condition: Expr, pub body: Box<Statement>}
 #[derive(Clone)]
-pub struct BlockStatement{statements: Vec<Statement>}
+pub struct BlockStatement{pub statements: Vec<Statement>}
 #[derive(Clone)]
-pub struct VarDeclaration{name: Token, initializer: Option<Expr>}
+pub struct VarDeclaration{pub name: Token, pub initializer: Option<Expr>}
 
 impl Interpreter {
 	/// Interpret a list of statements sequentially. Quits the program upon error

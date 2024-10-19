@@ -1,9 +1,9 @@
-use std::time::UNIX_EPOCH;
+use std::{collections::HashMap, time::UNIX_EPOCH};
 
 use error::{check_number_operand, check_number_operands, ValueError, ValueResult};
 use values::{Callable, Native, Value};
 
-use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary}, scanner::token::TokenType, statement::environment::EnvCell};
+use crate::{parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary, ExprVariable}, scanner::token::{Token, TokenType}, statement::environment::EnvCell};
 
 pub mod values;
 pub mod error;
@@ -12,13 +12,14 @@ pub mod error;
 pub struct Interpreter {
 	pub environment: EnvCell,
 	pub globals: EnvCell,
+	pub locals: HashMap<Expr, usize>
 }
 
 impl Interpreter {
 	/// Initialize a new interpreter
 	pub fn new() -> Self {
 		let globals = EnvCell::new();
-		let mut new = Self {environment: EnvCell::with_enclosing(&globals), globals};
+		let mut new = Self {environment: EnvCell::with_enclosing(&globals), globals, locals: HashMap::new()};
 		
 		fn get_curr_time() -> Value {
 			let v = std::time::SystemTime::now()
@@ -189,10 +190,33 @@ impl Interpreter {
 impl Interpreter {
 	/// Interpret an assignment expression
 	pub fn interpret_expr_assignment(&mut self, expr: ExprAssignment) -> ValueResult<Value> {
-		let value = self.interpret_expr(*expr.value)?;
+		let value = self.interpret_expr(*expr.value.clone())?;
+		let name = expr.name.clone();
 
-		self.environment.assign(expr.name, value.clone())?;
+		if let Some(&distance) = self.locals.get(&Expr::Assignment(expr)) {
+			self.environment.assign_at(distance, &name, value.clone());
+		} else {
+			self.globals.assign(name, value.clone())?;
+		}
+
 		Ok(value)
+	}
+
+
+}
+
+impl Interpreter {
+	/// Interpret a variable expression
+	pub fn interpret_expr_variable(&mut self, expr: ExprVariable) -> ValueResult<Value> {
+		self.look_up_variable(expr.name.clone(), expr)
+	}
+
+	pub fn look_up_variable(&mut self, name: Token, expr: ExprVariable) -> ValueResult<Value> {
+		if let Some(&distance) = self.locals.get(&Expr::Variable(expr)) {
+			return Ok(self.environment.get_at(distance, name.lexeme.clone()))
+		} else {
+			return Ok(self.globals.get(name)?)
+		}
 	}
 }
 
@@ -208,5 +232,11 @@ impl Interpreter {
 		}
 
 		return self.interpret_expr(*expr.right);
+	}
+}
+
+impl Interpreter {
+	pub fn resolve_expr_depth(&mut self, expr: Expr, depth: usize) {
+		self.locals.insert(expr, depth);
 	}
 }

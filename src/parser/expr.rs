@@ -1,6 +1,8 @@
+use std::{cmp::Ordering, hash::Hash};
+
 use crate::scanner::token::Token;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
 	Literal(ExprLiteral),
 	Unary(ExprUnary),
@@ -57,6 +59,69 @@ pub enum ExprLiteral {
 	Null
 }
 
+impl Hash for ExprLiteral {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		// let self_ = self.clone();
+		match self {
+			ExprLiteral::STRING(s) => {s.hash(state);},
+			ExprLiteral::NUMBER(n) => {
+				if n.is_nan() {
+					(f64::NAN).to_be_bytes().hash(state);
+				} else {
+					n.to_be_bytes().hash(state);
+				}
+
+			},
+			k => {
+				std::mem::discriminant(k).hash(state);
+			}
+		}
+	}
+}
+
+impl Eq for ExprLiteral {}
+
+impl PartialEq for ExprLiteral {
+	fn eq(&self, other: &Self) -> bool {
+		// let self_ = self.clone();
+		// let other = other.clone();
+
+		match (self, other) {
+			(ExprLiteral::Null, ExprLiteral::Null) => true,
+			(ExprLiteral::STRING(s), ExprLiteral::STRING(o)) => {
+				s == o
+			}
+			(ExprLiteral::True, ExprLiteral::True,) => true,
+			(ExprLiteral::False, ExprLiteral::False) => true,
+			(ExprLiteral::NUMBER(s), ExprLiteral::NUMBER(o)) => {
+				match (s.is_finite(), o.is_finite()) {
+					(true, true) => {
+						let ord = s.partial_cmp(&o).unwrap_or_else(| | {
+							eprintln!("Failed to partially compare two finite f64 values, this should not have happened. Replacing with `Ordering::Equal`");
+							return Ordering::Equal
+						});
+						match ord {
+							Ordering::Equal => true,
+							_ => false
+						}
+					},
+					(false, false) => {
+						match(s, o) {
+							(&f64::INFINITY, &f64::INFINITY) => true,
+							(&f64::NEG_INFINITY, &f64::NEG_INFINITY) => true,
+							(s, o) => {
+								return s.is_nan() && o.is_nan()
+							}
+						}
+					}
+					_ => false
+				}
+			},
+			_ => false
+		}
+	}
+}
+
 impl Expr {
 	pub fn new_binary(left: Expr, operator: Token, right: Expr) -> Expr {
 		Expr::Binary(ExprBinary {left: Box::new(left), operator, right: Box::new(right)})
@@ -93,16 +158,16 @@ impl ToString for ExprLiteral {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprGrouping(pub Box<Expr>);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprUnary {
 	pub operator: Token,
 	pub right: Box<Expr>
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprCall {
 	pub callee: Box<Expr>,
 	pub paren: Token,
@@ -110,26 +175,26 @@ pub struct ExprCall {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprBinary {
 	pub left: Box<Expr>,
 	pub operator: Token,
 	pub right: Box<Expr>
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprLogical {
 	pub left: Box<Expr>,
 	pub operator: Token,
 	pub right: Box<Expr>
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprVariable {
 	pub name: Token
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprAssignment {
 	pub name: Token,
 	pub value: Box<Expr>

@@ -50,6 +50,25 @@ impl EnvCell {
 		return new_env_cell;
 
 	}
+
+	pub fn get_at(&mut self, distance: usize, name: String) -> Value {
+		self.ancestor(distance).0.borrow().values.get(&name).expect("Unwrap failed on EnvCell, get_at").clone()
+	}
+
+	pub fn ancestor(&mut self, distance: usize) -> Self {
+		let mut environment = self.clone();
+
+		for _ in 0..distance {
+			let e = environment.0.borrow().enclosing.clone().expect("Environment: Reached maximum ancestor distance, ancestor not found");
+			environment = e;
+		}
+
+		environment
+	}
+
+	pub fn assign_at(&mut self, distance: usize, name: &Token, value: Value) {
+		self.ancestor(distance).0.borrow_mut().values.insert(name.lexeme.clone(), value);
+	}
 }
 
 

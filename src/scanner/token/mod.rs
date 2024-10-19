@@ -1,6 +1,6 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::{collections::HashMap, hash::Hash, sync::OnceLock};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Token {
 	pub token_type: TokenType,
 	pub lexeme: String,
@@ -20,7 +20,7 @@ impl std::fmt::Display for Token {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[allow(unused, non_camel_case_types)]
 pub enum TokenType {
   // Single-character tokens.
@@ -86,6 +86,34 @@ pub enum Literal {
 	String(String),
 	Float(f64),
 	Boolean(bool)
+}
+
+impl Eq for Literal {}
+
+impl Hash for Literal {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		// let self_ = self.clone();
+		match self {
+			Literal::String(s) => {s.hash(state);},
+			Literal::Float(n) => {
+				if n.is_nan() {
+					(f64::NAN).to_be_bytes().hash(state);
+				} else {
+					n.to_be_bytes().hash(state);
+				}
+
+			},
+			Literal::Integer(i) => {
+				i.hash(state);
+			}
+			Literal::Boolean(b) => {
+				b.hash(state);
+			}
+			k => {
+				std::mem::discriminant(k).hash(state);
+			}
+		}
+	}
 }
 
 impl std::fmt::Display for Literal {

@@ -5,6 +5,7 @@ use std::io::{self, Write};
 use interpreter::Interpreter;
 use parser::expr::AstPrinter;
 use parser::Parser;
+use resolver::Resolver;
 use scanner::Scanner;
 
 pub mod scanner;
@@ -13,6 +14,7 @@ pub mod parser;
 pub mod error;
 pub mod interpreter;
 pub mod statement;
+pub mod resolver;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -157,6 +159,18 @@ impl Lox {
         match statements {
             Ok(statements) => {
                 let mut interpreter = Interpreter::new();
+                let mut resolver = Resolver::new(interpreter);
+
+                let r = resolver.resolve_statements(statements.clone());
+
+                if let Err(_) = r {
+                    println!("{:?}", resolver.scopes);
+                    std::process::exit(65);
+                }
+
+                eprintln!("Resolving complete, now interpreting");
+
+                interpreter = resolver.interpreter;                
                 interpreter.interpret_statements(statements);
             },
             Err(_) => {std::process::exit(65);}
