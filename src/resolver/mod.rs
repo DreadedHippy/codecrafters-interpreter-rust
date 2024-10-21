@@ -2,25 +2,35 @@ use std::collections::HashMap;
 
 use error::{ResolverError, ResolverResult};
 
-use crate::{interpreter::Interpreter, parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGrouping, ExprLiteral, ExprLogical, ExprUnary, ExprVariable}, scanner::token::Token, statement::{BlockStatement, ExprStatement, FunctionStatement, IfStatement, PrintStatement, ReturnStatement, Statement, VarDeclaration, WhileStatement}};
+use crate::{interpreter::Interpreter, parser::expr::{Expr, ExprAssignment, ExprBinary, ExprCall, ExprGet, ExprGrouping, ExprLiteral, ExprLogical, ExprSet, ExprThis, ExprUnary, ExprVariable}, scanner::token::Token, statement::{BlockStatement, ClassDecl, ExprStatement, FunctionDecl, IfStatement, PrintStatement, ReturnStatement, Statement, VarDeclaration, WhileStatement}};
 
 pub mod error;
 pub struct Resolver {
 	pub interpreter: Interpreter,
 	pub scopes: Vec<HashMap<String, bool>>,
 	current_function: FunctionType,
+	current_class: ClassType,
 }
 
 #[derive(Clone, PartialEq)]
 pub enum FunctionType {
 	NONE,
-	FUNCTION
+	FUNCTION,
+	METHOD,
+	INITIALIZER
+}
+
+
+#[derive(Clone, PartialEq)]
+pub enum ClassType {
+	NONE,
+	CLASS
 }
 
 
 impl Resolver {
 	pub fn new(interpreter: Interpreter) -> Self {
-		Self {interpreter, scopes: Vec::new(), current_function: FunctionType::NONE}
+		Self {interpreter, scopes: Vec::new(), current_function: FunctionType::NONE, current_class: ClassType::NONE}
 	}
 
 	// region:    --- Statements
@@ -34,21 +44,21 @@ impl Resolver {
 		Ok(())
 	}
 
-	fn resolve_func(&mut self, function: FunctionStatement,  function_type: FunctionType) -> ResolverResult<()> {
+	fn resolve_func(&mut self, function: FunctionDecl,  function_type: FunctionType) -> ResolverResult<()> {
 		let enclosing_function = self.current_function.clone();
 
 		self.current_function = function_type;
 
 		self.begin_scope();
 
-		let FunctionStatement {name: _, body, params} = function;
+		let FunctionDecl {name: _, body, params} = function;
 
 		for param in params {
-			self.declare(param.clone());
-			self.define(param);
+			self.declare(&param)?;
+			self.define(&param);
 		}
 
-		self.resolve_statements(body);
+		self.resolve_statements(body)?;
 
 		self.end_scope();
 
@@ -61,8 +71,37 @@ impl Resolver {
 
 	pub fn resolve_block_statement(&mut self, s: BlockStatement) -> ResolverResult<()> {
 		self.begin_scope();
-		self.resolve_statements(s.statements);
+		self.resolve_statements(s.statements)?;
 		self.end_scope();
+
+		Ok(())
+	}
+
+	pub fn resolve_class_decl(&mut self, s: ClassDecl) -> ResolverResult<()> {
+		let enclosing_class = self.current_class.clone();
+		self.current_class = ClassType::CLASS;
+
+		self.declare(&s.name)?;
+		self.define(&s.name);
+
+		self.begin_scope();
+
+		self.scopes.last_mut().and_then(|scope| scope.insert("this".to_string(), true));
+
+		for method in s.methods {
+			let declaration = if method.name.lexeme == "init" {
+				FunctionType::INITIALIZER
+			} else {
+				FunctionType::METHOD
+			};
+
+
+			self.resolve_func(method, declaration)?;
+		}
+
+		self.end_scope();
+		
+		self.current_class = enclosing_class;
 
 		Ok(())
 	}
@@ -73,12 +112,12 @@ impl Resolver {
 		Ok(())
 	}
 
-	pub fn resolve_func_statement(&mut self, s: FunctionStatement,) -> ResolverResult<()> {
+	pub fn resolve_func_statement(&mut self, s: FunctionDecl,) -> ResolverResult<()> {
 		// Eagerly resolve name to allow recursion
-		self.declare(s.name.clone());
-		self.define(s.name.clone());
+		self.declare(&s.name)?;
+		self.define(&s.name);
 
-		self.resolve_func(s, FunctionType::FUNCTION);
+		self.resolve_func(s, FunctionType::FUNCTION)?;
 
 		Ok(())
 	}
@@ -103,10 +142,13 @@ impl Resolver {
 
 	pub fn resolve_return_statement(&mut self, statement: ReturnStatement) -> ResolverResult<()> {
 		if self.current_function == FunctionType::NONE {
-			return Err(self.error(statement.keyword, "Can't return from top-level code".to_string()));
+			return Err(self.error(statement.keyword, "Can't return from top-level code.".to_string()));
 		}
 
 		if let Some(value) = statement.value {
+			if self.current_function == FunctionType::INITIALIZER {
+				return Err(self.error(statement.keyword, "Can't return from an initializer.".to_string()))
+			}
 			self.resolve_expr(value)?;
 		}
 		
@@ -114,13 +156,13 @@ impl Resolver {
 	}
 
 	pub fn resolve_var_statement(&mut self, s: VarDeclaration) -> ResolverResult<()> {
-		self.declare(s.name.clone())?;
+		self.declare(&s.name)?;
 
 		if let Some(initializer) = s.initializer {
 			self.resolve_expr(initializer)?;
 		}
 
-		self.define(s.name);
+		self.define(&s.name);
 
 		Ok(())
 	}
@@ -157,6 +199,12 @@ impl Resolver {
 		Ok(())
 	}
 
+	pub fn resolve_expr_get(&mut self, expr: ExprGet) -> ResolverResult<()> {
+		self.resolve_expr(*expr.object)?;
+
+		Ok(())
+	}
+
 	pub fn resolve_expr_grouping(&mut self, ExprGrouping(expr): ExprGrouping) -> ResolverResult<()> {
 		self.resolve_expr(*expr)?;
 
@@ -170,6 +218,27 @@ impl Resolver {
 	pub fn resolve_expr_logical(&mut self, expr: ExprLogical) -> ResolverResult<()> {
 		self.resolve_expr(*expr.left)?;
 		self.resolve_expr(*expr.right)?;
+
+		Ok(())
+	}
+
+	pub fn resolve_expr_set(&mut self, expr: ExprSet) -> ResolverResult<()> {
+		self.resolve_expr(*expr.value)?;
+		self.resolve_expr(*expr.object)?;
+
+		Ok(())
+	}
+
+	pub fn resolve_expr_this(&mut self, expr: ExprThis) -> ResolverResult<()> {
+
+		if self.current_class == ClassType::NONE {
+			return Err(self.error(expr.keyword.clone(), "Can't use 'this' outside of a class".to_string()))
+		}
+
+		let expr_this = Expr::This(expr.clone());
+		let keyword = expr.keyword;
+
+		self.resolve_local(expr_this, keyword);
 
 		Ok(())
 	}
@@ -208,6 +277,7 @@ impl Resolver {
 			Statement::Return(s) => {self.resolve_return_statement(s)?},
 			Statement::While(s) => {self.resolve_while_statement(s)?},
 			Statement::Function(s) => {self.resolve_func_statement(s)?},
+			Statement::Class(s) => {self.resolve_class_decl(s)?},
 			Statement::Expression(s) => {self.resolve_expression_statement(s)?},
 			Statement::Var(s) => {self.resolve_var_statement(s)?},
 		}
@@ -225,6 +295,9 @@ impl Resolver {
 			Expr::Grouping(expr) => {self.resolve_expr_grouping(expr)?},
 			Expr::Literal(expr) => {self.resolve_expr_literal(expr)?},
 			Expr::Call(expr) => {self.resolve_expr_call(expr)?},
+			Expr::Get(expr) => {self.resolve_expr_get(expr)?},
+			Expr::Set(expr) => {self.resolve_expr_set(expr)?},
+			Expr::This(expr) => {self.resolve_expr_this(expr)?},
 			Expr::Variable(expr) => {self.resolve_expr_variable(expr)?},
 			Expr::Logical(expr) => {self.resolve_expr_logical(expr)?},
 		}
@@ -245,7 +318,7 @@ impl Resolver {
 		self.scopes.pop();
 	}
 
-	fn declare(&mut self, name: Token) -> ResolverResult<()> {
+	fn declare(&mut self, name: &Token) -> ResolverResult<()> {
 		if let Some(scope) = self.scopes.last_mut() {
 			if scope.contains_key(&name.lexeme) {
 				return Err(self.error(name.clone(), "Already a variable with this name in this scope".to_string()))
@@ -258,9 +331,9 @@ impl Resolver {
 		Ok(())
 	}
 
-	fn define(&mut self, name: Token) {
+	fn define(&mut self, name: &Token) {
 		if let Some(scope) = self.scopes.last_mut() {
-			scope.insert(name.lexeme, true);
+			scope.insert(name.lexeme.clone(), true);
 		}
 	}
 

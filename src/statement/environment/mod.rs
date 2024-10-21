@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use error::{EnvironmentError, EnvironmentResult};
 
-use crate::{interpreter::values::Value, scanner::token::Token};
+use crate::{interpreter::values::{Value, ValueCell}, scanner::token::Token};
 
 pub mod error;
 
@@ -10,18 +10,22 @@ pub mod error;
 /// A struct representing an interpreter's environment
 #[derive(Default, Clone)]
 pub struct Environment {
-	pub values: HashMap<String, Value>,
+	pub values: HashMap<String, ValueCell>,
 	pub enclosing: Option<EnvCell>
 }
 
 /// A struct holding references to environments, this is to allow for self-references
 #[derive(Clone)]
-pub struct EnvCell(Rc<RefCell<Environment>>);
+pub struct EnvCell(pub Rc<RefCell<Environment>>);
 
 impl EnvCell {
 	pub fn new() -> Self {
 		let e = Environment::default();
 		Self(Rc::new(RefCell::new(e)))
+	}
+
+	pub fn with_environment(environment: Environment) -> Self {
+		Self(Rc::new(RefCell::new(environment)))
 	}
 
 	/// Define an environment entry, by mutably borrowing the inner environment
@@ -35,7 +39,7 @@ impl EnvCell {
 	}
 
 	/// Gets the value for a given entry inside the inner environment
-	pub fn get(&self, name: Token) -> EnvironmentResult<Value> {
+	pub fn get(&self, name: Token) -> EnvironmentResult<ValueCell> {
 		return self.0.borrow().get(name)
 	}
 
@@ -51,7 +55,7 @@ impl EnvCell {
 
 	}
 
-	pub fn get_at(&mut self, distance: usize, name: String) -> Value {
+	pub fn get_at(&mut self, distance: usize, name: String) -> ValueCell {
 		self.ancestor(distance).0.borrow().values.get(&name).expect("Unwrap failed on EnvCell, get_at").clone()
 	}
 
@@ -67,7 +71,7 @@ impl EnvCell {
 	}
 
 	pub fn assign_at(&mut self, distance: usize, name: &Token, value: Value) {
-		self.ancestor(distance).0.borrow_mut().values.insert(name.lexeme.clone(), value);
+		self.ancestor(distance).0.borrow_mut().values.insert(name.lexeme.clone(), ValueCell::new(value));
 	}
 }
 
@@ -83,11 +87,11 @@ impl Environment {
 
 	/// Defines/overwrites values for a new entry
 	pub fn define(&mut self, name: String, value: Value) {
-		self.values.insert(name, value);
+		self.values.insert(name, ValueCell::new(value));
 	}
 
 	/// Gets the value for a given entry
-	pub fn get(&self, name: Token) -> EnvironmentResult<Value> {
+	pub fn get(&self, name: Token) -> EnvironmentResult<ValueCell> {
 		// Check current scope
 		if let Some(v) = self.values.get(&name.lexeme) {
 			return Ok(v.clone())
@@ -105,7 +109,7 @@ impl Environment {
 	/// Overwrites value for a given entry, repeatedly going up the environment chain. Panics if entry is not found
 	pub fn assign(&mut self, name: Token, value: Value) -> EnvironmentResult<()> {
 		if let Some(v) = self.values.get_mut(&name.lexeme) {
-			*v = value;
+			*v = ValueCell::new(value);
 			return Ok(())
 		}
 

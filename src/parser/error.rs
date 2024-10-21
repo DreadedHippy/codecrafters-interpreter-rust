@@ -11,8 +11,8 @@ pub type ParserResult<T> = Result<T, ParserError>;
 
 impl ParserError {
 	/// Create a new parser error
-	pub fn new(token: Token, message: String) -> Self {
-		Self { token, message }
+	pub fn new(token: Token, message: &str) -> Self {
+		Self { token, message: message.to_string() }
 	}
 
 	/// Construct an error report, and report it	

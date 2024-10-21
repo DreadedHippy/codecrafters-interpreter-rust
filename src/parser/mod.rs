@@ -1,4 +1,4 @@
-use expr::{Expr, ExprCall, ExprLiteral, ExprLogical};
+use expr::{Expr, ExprCall, ExprGet, ExprLiteral, ExprLogical, ExprThis};
 use error::{ParserError, ParserResult};
 
 use crate::scanner::token::{Literal, Token, TokenType};
@@ -45,7 +45,10 @@ impl Parser {
 					let name = v.name;
 					return Ok(Expr::new_assignment(name, value))
 				},
-				_ => return Err(ParserError::new(equals, "Invalid assignment target".to_string()))
+				Expr::Get(g) => {
+					return Ok(Expr::new_set(*g.object, g.name, value))
+				}
+				_ => return Err(ParserError::new(equals, "Invalid assignment target"))
 			}
 		}
 
@@ -159,7 +162,7 @@ impl Parser {
 		while self.match_next(vec![TokenType::MINUS, TokenType::PLUS]) {
 			// If invalid LHS
 			match expr {
-				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.previous(), format!("Invalid LHS for binary expression")))},
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.previous(), "Invalid LHS for binary expression"))},
 				_ => {}
 			}
 
@@ -167,7 +170,7 @@ impl Parser {
 			let right = self.factor()?;
 
 			match right {
-				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), format!("Invalid RHS for binary expression")))},
+				Expr::Literal(ExprLiteral::Null) => {return Err(self.error(self.peek(), "Invalid RHS for binary expression"))},
 				_ => {}
 			}
 
@@ -209,6 +212,9 @@ impl Parser {
 		loop {
 			if self.match_next(vec![TokenType::LEFT_PAREN]) {
 				expr = self.finish_call(expr)?;
+			} else if self.match_next(vec![TokenType::DOT]) {
+				let name = self.consume(TokenType::IDENTIFIER, "Expect property name after '.'")?;
+				expr = Expr::Get(ExprGet {name, object: Box::new(expr)})
 			} else {
 				break
 			}
@@ -224,7 +230,7 @@ impl Parser {
 		if !self.check(TokenType::RIGHT_PAREN) {
 			loop {
 				if arguments.len() >= 255 {
-					self.error(self.peek(), "Can't have more than 255 arguments".to_string());
+					self.error(self.peek(), "Can't have more than 255 arguments");
 				}
 				arguments.push(self.expression()?);
 				if !self.match_next(vec![TokenType::COMMA]) {
@@ -233,7 +239,7 @@ impl Parser {
 			}
 		}
 
-		let paren = self.consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments".to_string())?;
+		let paren = self.consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments")?;
 
 		Ok(Expr::Call(ExprCall {callee: Box::new(callee), arguments, paren}))
 
@@ -262,13 +268,17 @@ impl Parser {
 			return Ok(Expr::Literal(ExprLiteral::STRING(v)))
 		}
 
+		if self.match_next(vec![TokenType::THIS]) {
+			return Ok(Expr::This(ExprThis {keyword:  self.previous()}))
+		}
+
 		if self.match_next(vec![TokenType::IDENTIFIER]) {
 			return Ok(Expr::new_variable(self.previous()))
 		}
 
 		if self.match_next(vec![TokenType::LEFT_PAREN]) {
 			let expr = self.expression()?;
-			self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression".to_string())?;
+			self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression")?;
 			return Ok(Expr::new_grouping(expr));
 		}
 
@@ -277,7 +287,7 @@ impl Parser {
 	}
 
 	/// Expect a given token to be at the current position, throws an error otherwise
-	pub fn consume(&mut self, token_type: TokenType, message: String) -> ParserResult<Token> {
+	pub fn consume(&mut self, token_type: TokenType, message: &str) -> ParserResult<Token> {
 		if self.check(token_type) {
 			return Ok(self.advance())
 		}
@@ -286,7 +296,7 @@ impl Parser {
 	}
 
 	/// Generate a ParseeError
-	pub fn error(&mut self, token: Token, message: String) -> ParserError {
+	pub fn error(&mut self, token: Token, message: &str) -> ParserError {
 		self.had_error = true;
 		let error = ParserError::new(token, message);
 		error.error();

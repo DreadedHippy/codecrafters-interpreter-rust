@@ -16,7 +16,7 @@ impl ValueError {
 
 	pub fn error(&self) {
 		match self {
-			Self::Std { token, message } => eprintln!("{}\n[line {}]", message, token.line),
+			Self::Std { token, message } => eprintln!("[line {}] Error: {}", token.line, message),
 			Self::Break => eprintln!("'BREAK' value error detected"),
 			Self::Continue => eprintln!("'CONTINUE' value error detected"),
 			Self::Return(v) => eprintln!("'RETURN' value error detected, value {}", v),

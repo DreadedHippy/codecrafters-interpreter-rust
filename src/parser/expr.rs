@@ -5,13 +5,16 @@ use crate::scanner::token::Token;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
 	Literal(ExprLiteral),
-	Unary(ExprUnary),
 	Call(ExprCall),
 	Binary(ExprBinary),
 	Grouping(ExprGrouping),
 	Variable(ExprVariable),
 	Assignment(ExprAssignment),
+	Get(ExprGet),
 	Logical(ExprLogical),
+	Set(ExprSet),
+	This(ExprThis),
+	Unary(ExprUnary),
 }
 
 impl ExprAccept for Expr {
@@ -20,6 +23,9 @@ impl ExprAccept for Expr {
 			Expr::Literal(x) => x.accept(),
 			Expr::Unary(u) => u.accept(),
 			Expr::Call(c) => c.accept(),
+			Expr::Get(g) => g.accept(),
+			Expr::Set(s) => s.accept(),
+			Expr::This(t) => t.accept(),
 			Expr::Binary(b) => b.accept(),
 			Expr::Grouping(g) => g.accept(),
 			Expr::Variable(v) => v.accept(),
@@ -143,6 +149,10 @@ impl Expr {
 		Expr::Assignment(ExprAssignment {name, value: Box::new(value)})
 	}
 
+	pub fn new_set(object: Expr, name: Token, value: Expr) -> Expr {
+		Expr::Set(ExprSet {name, object: Box::new(object), value: Box::new(value)})
+	}
+
 }
 
 impl ToString for ExprLiteral {
@@ -174,6 +184,23 @@ pub struct ExprCall {
 	pub arguments: Vec<Expr>
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ExprGet {
+	pub object: Box<Expr>,
+	pub name: Token,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ExprSet {
+	pub object: Box<Expr>,
+	pub name: Token,
+	pub value: Box<Expr>
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ExprThis {
+	pub keyword: Token,
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ExprBinary {
@@ -225,6 +252,25 @@ impl ExprAccept for ExprUnary {
 impl ExprAccept for ExprCall {
 	fn accept(self) -> String {
 		self.paren.lexeme
+	}
+}
+
+impl ExprAccept for ExprGet {
+	fn accept(self) -> String {
+		Expr::parenthesize(self.name.lexeme, vec![*self.object])
+	}
+}
+
+impl ExprAccept for ExprSet {
+	fn accept(self) -> String {
+		Expr::parenthesize(self.name.lexeme, vec![*self.object, *self.value])
+	}
+}
+
+
+impl ExprAccept for ExprThis {
+	fn accept(self) -> String {
+		self.keyword.lexeme.clone()
 	}
 }
 

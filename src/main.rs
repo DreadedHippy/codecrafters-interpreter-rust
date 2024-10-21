@@ -164,7 +164,7 @@ impl Lox {
                 let r = resolver.resolve_statements(statements.clone());
 
                 if let Err(_) = r {
-                    println!("{:?}", resolver.scopes);
+                    // println!("{:?}", resolver.scopes);
                     std::process::exit(65);
                 }
 

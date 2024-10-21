@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use environment::EnvCell;
 use error::{StatementError, StatementResult};
 
-use crate::{interpreter::{error::{ValueError, ValueResult}, values::{LoxFunction, Value}, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
+use crate::{interpreter::{error::{ValueError, ValueResult}, values::{LoxClass, LoxFunction, Value}, Interpreter}, parser::{ expr::{Expr, ExprLiteral}, Parser}, scanner::token::{Token, TokenType}};
 
 pub mod error;
 pub mod environment;
@@ -9,7 +11,8 @@ pub mod environment;
 pub enum Statement {
 	Print(PrintStatement),
 	Expression(ExprStatement),
-	Function(FunctionStatement),
+	Function(FunctionDecl),
+	Class(ClassDecl),
 	Return(ReturnStatement),
 	If(IfStatement),
 	While(WhileStatement),
@@ -31,18 +34,19 @@ pub struct PrintStatement(pub Expr);
 pub struct ExprStatement(pub Expr);
 
 #[derive(Clone)]
-pub struct FunctionStatement{pub name: Token, pub params: Vec<Token>, pub body: Vec<Statement>}
-
+pub struct FunctionDecl{pub name: Token, pub params: Vec<Token>, pub body: Vec<Statement> }
 #[derive(Clone)]
-pub struct ReturnStatement{pub keyword: Token, pub value: Option<Expr>}
+pub struct ReturnStatement{ pub keyword: Token, pub value: Option<Expr> }
 #[derive(Clone)]
-pub struct IfStatement{pub condition: Expr, pub then_branch: Box<Statement>, pub else_branch: Option<Box<Statement>>}
+pub struct IfStatement{ pub condition: Expr, pub then_branch: Box<Statement>, pub else_branch: Option<Box<Statement>> }
 #[derive(Clone)]
-pub struct WhileStatement{pub condition: Expr, pub body: Box<Statement>}
+pub struct WhileStatement{ pub condition: Expr, pub body: Box<Statement>}
 #[derive(Clone)]
-pub struct BlockStatement{pub statements: Vec<Statement>}
+pub struct BlockStatement{ pub statements: Vec<Statement>}
 #[derive(Clone)]
-pub struct VarDeclaration{pub name: Token, pub initializer: Option<Expr>}
+pub struct ClassDecl{ pub name: Token, pub methods: Vec<FunctionDecl>}
+#[derive(Clone)]
+pub struct VarDeclaration{ pub name: Token, pub initializer: Option<Expr> }
 
 impl Interpreter {
 	/// Interpret a list of statements sequentially. Quits the program upon error
@@ -71,6 +75,7 @@ impl Interpreter {
 			Statement::Break() => {self.interpret_break_statement()},
 			Statement::Continue() => {self.interpret_continue_statement()},
 			Statement::Function(f) => {self.interpret_function_statement(f)},
+			Statement::Class(c) => {self.interpret_class_decl(c)},
 			Statement::Return(r) => {self.interpret_return_statement(r)},
 		}
 	}
@@ -86,7 +91,7 @@ impl Interpreter {
 	pub fn interpret_print_statement(&mut self, s: PrintStatement) -> ValueResult<()> {
 		let v = self.interpret_expr(s.0)?;
 
-		println!("{}", v);
+		println!("{}", v.value());
 
 		Ok(())
 	}
@@ -96,7 +101,7 @@ impl Interpreter {
 		let mut value = Value::Nil;
 
 		if let Some(e) = s.initializer {
-			value = self.interpret_expr(e)?;
+			value = self.interpret_expr(e)?.value();
 		}
 
 		self.environment.define(s.name.lexeme, value);
@@ -119,6 +124,24 @@ impl Interpreter {
 		Ok(())
 	}
 
+	pub fn interpret_class_decl(&mut self, s: ClassDecl) -> ValueResult<()> {
+		self.environment.define(s.name.lexeme.clone(), Value::Nil);
+
+		let mut methods = HashMap::new();
+
+		for method in s.methods {
+			let name = method.name.lexeme.clone();
+			let function = LoxFunction::new(method, self.environment.clone(), name == "init");
+			methods.insert(name, function);
+		}
+
+		let class = Value::Class(LoxClass::new(s.name.lexeme.clone(), methods));
+		self.environment.assign(s.name.clone(), class)?;
+
+		Ok(())
+	}
+
+
 	/// Interpret statements sequentially, bubbling up errors to the top
 	pub fn execute_statements(&mut self, statements: Vec<Statement>) -> ValueResult<()> {
 
@@ -133,7 +156,7 @@ impl Interpreter {
 
 	/// Interpret if statement
 	pub fn interpret_if_statement(&mut self, s: IfStatement) -> ValueResult<()> {
-		if self.interpret_expr(s.condition)?.is_truthy() {
+		if self.interpret_expr(s.condition)?.value().is_truthy() {
 			self.interpret_statement(*s.then_branch)?
 		} else {
 			if let Some(statement) = s.else_branch {
@@ -146,7 +169,7 @@ impl Interpreter {
 
 	/// Interpret a while statement
 	pub fn interpret_while_statement(&mut self, s: WhileStatement) -> ValueResult<()> {
-		while self.interpret_expr(s.condition.clone())?.is_truthy() {
+		while self.interpret_expr(s.condition.clone())?.value().is_truthy() {
 			let v = self.interpret_statement(*s.body.clone());
 
 
@@ -172,9 +195,9 @@ impl Interpreter {
 	}
 
 	/// Interpret a function statement
-	pub fn interpret_function_statement(&mut self, s: FunctionStatement) -> ValueResult<()> {
+	pub fn interpret_function_statement(&mut self, s: FunctionDecl) -> ValueResult<()> {
 		let function_name = s.name.lexeme.clone();
-		let function = LoxFunction::new(s.clone(), self.environment.clone());
+		let function = LoxFunction::new(s.clone(), self.environment.clone(), false);
 		self.environment.define(function_name.clone(), Value::Function(function.clone()));
 
 
@@ -187,7 +210,7 @@ impl Interpreter {
 		let _ = s.keyword; // Just so we read the field, and prevent compiler warning
 
 		if let Some(v) = s.value {
-			value = self.interpret_expr(v)?;
+			value = self.interpret_expr(v)?.value();
 		}
 
 		Err(ValueError::Return(value))
@@ -224,8 +247,13 @@ impl Parser {
 
 	/// Parse a declaration
 	fn declaration(&mut self) -> StatementResult<Statement>{
+		
+		if self.match_next(vec![TokenType::CLASS]) {
+			return self.class_declaration()
+		}
+
 		if self.match_next(vec![TokenType::FUN]) {
-			return self.function("function".to_string())
+			return self.function("function")
 		}
 
 		if self.match_next(vec![TokenType::VAR]) {
@@ -235,20 +263,42 @@ impl Parser {
 		return self.statement()
 	}
 
-	/// Parse a function
-	fn function(&mut self, kind: String) -> StatementResult<Statement>{
-		let name = self.consume(TokenType::IDENTIFIER, format!("Expect {} name.", kind))?;
+	fn class_declaration(&mut self) -> StatementResult<Statement> {
+		let name = self.consume(TokenType::IDENTIFIER, "Expect class name.")?;
 
-		self.consume(TokenType::LEFT_PAREN, format!("Expect '(' after {} name.", kind))?;
+		self.consume(TokenType::LEFT_BRACE, "Expect '{' before class body")?;
+
+		let mut methods = Vec::new();
+
+		while !self.check(TokenType::RIGHT_BRACE)  && !self.is_at_end() {
+			let s = self.function("method")?;
+
+			match s {
+				Statement::Function(s ) => {methods.push(s);},
+				_ => {
+					return Err(self.error(self.previous(), "Non-function statement found in class body").into())
+				}
+			}
+		}
+
+		self.consume(TokenType::RIGHT_BRACE, "Expect '}' after class body")?;
+		return Ok(Statement::Class(ClassDecl {name, methods}));
+	}
+
+	/// Parse a function
+	fn function(&mut self, kind: &str) -> StatementResult<Statement>{
+		let name = self.consume(TokenType::IDENTIFIER, &format!("Expect {} name.", kind))?;
+
+		self.consume(TokenType::LEFT_PAREN, &format!("Expect '(' after {} name.", kind))?;
 		let mut parameters = Vec::new();
 
 		if !self.check(TokenType::RIGHT_PAREN) {
 			loop {
 				if parameters.len() >= 255 {
-					self.error(self.peek(), "Cant have more than 255 parameters".to_string());
+					self.error(self.peek(), "Cant have more than 255 parameters");
 				}
 
-				parameters.push(self.consume(TokenType::IDENTIFIER, "Expect parameter name".to_string())?);
+				parameters.push(self.consume(TokenType::IDENTIFIER, "Expect parameter name")?);
 
 				if !self.match_next(vec![TokenType::COMMA]) {
 					break
@@ -256,24 +306,24 @@ impl Parser {
 			}
 		}
 
-		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters".to_string())?;
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters")?;
 
-		self.consume(TokenType::LEFT_BRACE, format!("Expect '{{' before {} body", kind))?;
+		self.consume(TokenType::LEFT_BRACE, &format!("Expect '{{' before {} body", kind))?;
 
 		let body = self.block_statement()?;
 
 		let body = match body {
 			Statement::Block(s) => s.statements,
-			_ => return Err(StatementError::new(self.previous(), "Body not found inside after function, and '{', this ideally shouldn't happen"))
+			_ => return Err(StatementError::new(self.previous(), &format!("Body not found inside after {}", kind)))
 		};
 
-		return Ok(Statement::Function(FunctionStatement {name, params: parameters, body}))
+		return Ok(Statement::Function(FunctionDecl {name, params: parameters, body}))
 
 	}
 
 	/// Parse a variable declaration
 	fn var_declaration(&mut self) -> StatementResult<Statement> {
-		let name = self.consume(TokenType::IDENTIFIER, "Expect variable name.".to_string())?;
+		let name = self.consume(TokenType::IDENTIFIER, "Expect variable name.")?;
 		
 		let mut initializer = None;
 
@@ -281,7 +331,7 @@ impl Parser {
 			initializer = Some(self.expression()?);
 		}
 
-		self.consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.")?;
 
 		return Ok(Statement::new_var_statement(name, initializer))
 	}
@@ -334,7 +384,7 @@ impl Parser {
 		}
 
 
-		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after value.")?;
 		Ok(Statement::Print(value.into()))
 	}
 
@@ -347,7 +397,7 @@ impl Parser {
 			value = Some(self.expression()?);
 		}
 
-		self.consume(TokenType::SEMICOLON, "Expect ';' after a return value.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after a return value.")?;
 
 		return Ok(Statement::Return(ReturnStatement { keyword, value }));
 	}
@@ -360,7 +410,7 @@ impl Parser {
 			statements.push(self.declaration()?);
 		}
 
-		self.consume(TokenType::RIGHT_BRACE, "Expect '}' after block.".to_string())?;
+		self.consume(TokenType::RIGHT_BRACE, "Expect '}' after block.")?;
 
 		Ok(Statement::Block(BlockStatement{statements}))
 	}
@@ -368,17 +418,17 @@ impl Parser {
 	/// Parse an expression statement
 	fn expression_statement(&mut self) -> StatementResult<Statement> {
 		let value = self.expression()?;
-		self.consume(TokenType::SEMICOLON, "Expect ';' after value.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after value.")?;
 		Ok(Statement::Expression(value.into()))
 	}
 
 	/// Parse an if statement
 	fn if_statement(&mut self) -> StatementResult<Statement> {
-		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.".to_string())?;
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.")?;
 
 		let condition = self.expression()?;
 
-		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'if' condition".to_string())?;
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'if' condition")?;
 
 		let then_branch = Box::new(self.statement()?);
 		let mut else_branch = None;
@@ -392,10 +442,10 @@ impl Parser {
 
 	/// Parse a while statement
 	fn while_statement(&mut self) -> StatementResult<Statement> {
-		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.".to_string())?;
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.")?;
 
 		let condition = self.expression()?;
-		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'while' condition.".to_string())?;
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'while' condition.")?;
 
 
 		// Pre parse
@@ -417,7 +467,7 @@ impl Parser {
 
 	/// Parse a for statement
 	fn for_statement(&mut self) -> StatementResult<Statement> {
-		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.".to_string())?;
+		self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.")?;
 
 		let initializer = if self.match_next(vec![TokenType::SEMICOLON]) {
 			None
@@ -432,7 +482,7 @@ impl Parser {
 		if !self.check(TokenType::SEMICOLON) {
 			condition = Some(self.expression()?);
 		}
-		self.consume(TokenType::SEMICOLON, "Expect ';' after loop condition".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after loop condition")?;
 
 
 		let mut increment = None;
@@ -441,7 +491,7 @@ impl Parser {
 			increment = Some(self.expression()?)
 		}
 
-		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'for' clauses".to_string())?;
+		self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'for' clauses")?;
 
 		// Pre-parse
 		self.loop_depth += 1;
@@ -485,7 +535,7 @@ impl Parser {
 			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'break'."))
 		}
 
-		self.consume(TokenType::SEMICOLON, "Expect ';' after 'break.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after 'break.")?;
 		return Ok(Statement::Break())
 	}
 
@@ -495,7 +545,7 @@ impl Parser {
 			return Err(StatementError::new(self.previous(), "Must be inside a loop to use 'continue'."))
 		}
 
-		self.consume(TokenType::SEMICOLON, "Expect ';' after 'continue.".to_string())?;
+		self.consume(TokenType::SEMICOLON, "Expect ';' after 'continue.")?;
 		return Ok(Statement::Continue())
 	}
 
